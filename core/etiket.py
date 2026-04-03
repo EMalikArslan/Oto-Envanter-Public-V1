@@ -40,84 +40,98 @@ def _f(yol, pt):
 
 
 def etiket_olustur(barkod_id, stok_id, kategori, marka, ad, secili_refler):
-    """30x40mm @ 300dpi — TÜR YOK, büyük font, Türkçe uyumlu."""
+    """40x30mm @ 300dpi yatay — büyük font, Türkçe uyumlu."""
     os.makedirs(LABELS_DIR, exist_ok=True)
-    W, H = 354, 472
-    PAD  = 12
+    W, H = 472, 354   # 40x30 mm @ 300 dpi
+    PAD  = 10
     img  = Image.new("RGB",(W,H),"white")
     draw = ImageDraw.Draw(img)
     fp_k = _font_bul(True); fp_n = _font_bul(False)
 
-    f_marka = _f(fp_k, 32)
-    f_model = _f(fp_n, 26)
-    f_ref   = _f(fp_n, 22)
-    f_id    = _f(fp_k, 18)
-    f_kucuk = _f(fp_n, 14)
+    f_marka = _f(fp_k, 30)
+    f_model = _f(fp_n, 22)
+    f_ref   = _f(fp_n, 20)
+    f_id    = _f(fp_k, 17)
+    f_kucuk = _f(fp_n, 13)
 
-    y = PAD
-
-    # Logo
+    # ── Logo (sol üst) ────────────────────────────────────────────────────
+    logo_w = 0
     if os.path.exists(LOGO_PATH):
         try:
-            logo=Image.open(LOGO_PATH).convert("RGBA")
-            bw=min(130,W-PAD*2); lh=int(logo.size[1]*bw/logo.size[0])
-            logo=logo.resize((bw,lh),Image.Resampling.LANCZOS)
-            patch=Image.new("RGB",logo.size,"white"); patch.paste(logo,mask=logo.split()[3])
-            img.paste(patch,((W-bw)//2,y)); y+=lh+6
-        except: y+=20
-    else:
-        draw.text((W//2,y+10),"ARES",fill="#C0392B",font=f_kucuk,anchor="mm"); y+=22
+            logo = Image.open(LOGO_PATH).convert("RGBA")
+            lh   = min(46, H // 7)
+            lw   = int(logo.size[0] * lh / logo.size[1])
+            lw   = min(lw, 110)
+            logo = logo.resize((lw, lh), Image.Resampling.LANCZOS)
+            patch= Image.new("RGB", logo.size, "white")
+            patch.paste(logo, mask=logo.split()[3])
+            img.paste(patch, (PAD, PAD))
+            logo_w = lw + PAD
+        except:
+            pass
+    if not logo_w:
+        draw.text((PAD, PAD+6), "ARES", fill="#C0392B", font=f_kucuk)
+        logo_w = 48
 
-    draw.line([(PAD,y),(W-PAD,y)],fill="#DDDDDD",width=1); y+=6
+    # ── Kırmızı dikey çubuk ───────────────────────────────────────────────
+    bant_x = logo_w + PAD
+    draw.rectangle([(bant_x, PAD), (bant_x+5, PAD+72)], fill="#C0392B")
 
-    # Kırmızı çubuk
-    draw.rectangle([(PAD,y),(PAD+5,y+70)],fill="#C0392B")
+    # ── Marka & Model ─────────────────────────────────────────────────────
+    tx = bant_x + 10
+    draw.text((tx, PAD),      _tr(marka)[:20], fill="#1A1917", font=f_marka)
+    draw.text((tx, PAD + 34), _tr(ad)[:26],    fill="#555555", font=f_model)
 
-    # Marka
-    draw.text((PAD+10,y),_tr(marka)[:22],fill="#1A1917",font=f_marka); y+=36
-    # Model
-    draw.text((PAD+10,y),_tr(ad)[:26],fill="#555555",font=f_model); y+=30
+    # ── Ayırıcı ───────────────────────────────────────────────────────────
+    sep_y = PAD + 80
+    draw.line([(PAD, sep_y), (W-PAD, sep_y)], fill="#CCCCCC", width=1)
+    sep_y += 6
 
-    draw.line([(PAD,y),(W-PAD,y)],fill="#CCCCCC",width=1); y+=7
+    # ── Referanslar ───────────────────────────────────────────────────────
+    y = sep_y
+    for ref in secili_refler[:3]:
+        if ref and ref != "-":
+            draw.text((PAD+4, y), f"- {_tr(str(ref))[:32]}", fill="#1A1917", font=f_ref)
+            y += 24
 
-    # Referanslar
-    max_ref = max(1, min(3,(H-y-105)//26))
-    for ref in secili_refler[:max_ref]:
-        if ref and ref!="-":
-            draw.text((PAD+6,y),f"- {_tr(str(ref))[:26]}",fill="#1A1917",font=f_ref); y+=26
+    # ── Alt alan ──────────────────────────────────────────────────────────
+    alt_y = H - 88
+    draw.line([(PAD, alt_y), (W-PAD, alt_y)], fill="#CCCCCC", width=1)
+    alt_y += 4
 
-    # Alt bant
-    alt_y = H-100
-    draw.line([(PAD,alt_y),(W-PAD,alt_y)],fill="#CCCCCC",width=1); alt_y+=4
-
-    # QR
-    qr_size=64; qr_x=W-PAD-qr_size
+    # QR (sağ alt)
+    qr_size = 60; qr_x = W - PAD - qr_size
     if QR_OK:
         try:
-            qr=qrcode.QRCode(box_size=2,border=1,error_correction=qrcode.constants.ERROR_CORRECT_L)
+            qr = qrcode.QRCode(box_size=2, border=1,
+                               error_correction=qrcode.constants.ERROR_CORRECT_L)
             qr.add_data(WP_LINK); qr.make(fit=True)
-            qi=qr.make_image().resize((qr_size,qr_size),Image.Resampling.LANCZOS)
-            img.paste(qi,(qr_x,alt_y+2))
-        except: pass
+            qi = qr.make_image().resize((qr_size, qr_size), Image.Resampling.LANCZOS)
+            img.paste(qi, (qr_x, alt_y + 2))
+        except:
+            pass
 
-    draw.text((PAD,alt_y+4),f"ID: {barkod_id}",fill="#1A1917",font=f_id); alt_y+=22
+    # ID
+    draw.text((PAD, alt_y + 4), f"ID: {barkod_id}", fill="#1A1917", font=f_id)
 
-    # Barkod
+    # Barkod (sol alt, QR'ın soluna kadar)
     if BC_OK:
-        bc_w=qr_x-PAD-4; bc_h=H-alt_y-PAD
+        bc_w = qr_x - PAD - 6
+        bc_h = H - (alt_y + 26) - PAD
         try:
-            BC=barcode.get_barcode_class("code128")
-            tmp=os.path.join(LABELS_DIR,f"_t_{str(barkod_id).replace('-','_')}")
-            barcode.get_barcode_class("code128")(str(barkod_id),writer=ImageWriter()).save(
-                tmp,{"write_text":False,"module_height":10,"quiet_zone":1})
-            bi=Image.open(tmp+".png").resize((bc_w,max(bc_h,32)),Image.Resampling.LANCZOS)
-            img.paste(bi,(PAD,alt_y))
-            try: os.remove(tmp+".png")
+            tmp = os.path.join(LABELS_DIR, f"_t_{str(barkod_id).replace('-','_')}")
+            barcode.get_barcode_class("code128")(str(barkod_id), writer=ImageWriter()).save(
+                tmp, {"write_text": False, "module_height": 10, "quiet_zone": 1})
+            bi = Image.open(tmp + ".png").resize((bc_w, max(bc_h, 30)),
+                                                 Image.Resampling.LANCZOS)
+            img.paste(bi, (PAD, alt_y + 26))
+            try: os.remove(tmp + ".png")
             except: pass
-        except: pass
+        except:
+            pass
 
-    safe=str(barkod_id).replace("-","_")
-    path=os.path.join(LABELS_DIR,f"e_{safe}.png")
+    safe = str(barkod_id).replace("-", "_")
+    path = os.path.join(LABELS_DIR, f"e_{safe}.png")
     img.save(path)
     return path
 
