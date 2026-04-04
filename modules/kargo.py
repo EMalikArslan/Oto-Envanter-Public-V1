@@ -180,7 +180,7 @@ class YeniKargoSayfasi(QWidget):
         self._build()
 
     def _build(self):
-        self.setStyleSheet(f"background:{RENK['arka']}; color:{RENK['metin']};")
+        self.setStyleSheet(f"background:{RENK['zemin']}; color:{RENK['metin']};")
         ana = QHBoxLayout(self)
         ana.setContentsMargins(20, 16, 20, 16)
         ana.setSpacing(20)
@@ -237,7 +237,7 @@ class YeniKargoSayfasi(QWidget):
         sol.addStretch()
 
         # Stil
-        self.setStyleSheet(self.ALAN_STIL + f" QWidget{{ background:{RENK['arka']}; }}")
+        self.setStyleSheet(self.ALAN_STIL + f" QWidget{{ background:{RENK['zemin']}; }}")
 
         # ── SAĞ: Son Kargolar ────────────────────────────────────────────
         sag = QVBoxLayout()
