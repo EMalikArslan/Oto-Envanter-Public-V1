@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}İskonto — {{ kul.ad_soyad }}{% endblock %}
+{% block page_title %}İskonto: {{ kul.ad_soyad }}{% endblock %}
+{% block content %}
+<div class="row g-3">
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-header">İskonto Ekle</div>
+      <div class="card-body">
+        <form method="POST">
+          <input type="hidden" name="action" value="ekle">
+          <div class="mb-3">
+            <label class="form-label">İskonto Türü</label>
+            <select class="form-select" id="iskontoTur" onchange="iskontoTurDegis()">
+              <option value="kategori">Kategori Bazlı</option>
+              <option value="urun">Ürün Bazlı</option>
+            </select>
+          </div>
+          <div class="mb-3" id="kategoriDiv">
+            <label class="form-label">Kategori</label>
+            <select name="kategori" class="form-select">
+              <option value="">— Seçin —</option>
+              <option>Beyin</option><option>ABS</option><option>Plastik</option>
+            </select>
+          </div>
+          <div class="mb-3 d-none" id="urunDiv">
+            <label class="form-label">Ürün</label>
+            <select name="stok_id" class="form-select">
+              <option value="">— Seçin —</option>
+              {% for u in urunler %}
+              <option value="{{ u.id }}">{{ u.marka }} / {{ u.yaygin_ad }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">İskonto Oranı (%)</label>
+            <input type="number" name="oran" class="form-control" step="0.5" min="0" max="100" value="0">
+          </div>
+          <button type="submit" class="btn btn-ares w-100">Ekle</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header">Mevcut İskontolar</div>
+      {% if iskontolar %}
+      <div class="table-responsive">
+        <table class="table mb-0">
+          <thead><tr><th>Kapsam</th><th>Oran</th><th></th></tr></thead>
+          <tbody>
+            {% for i in iskontolar %}
+            <tr>
+              <td>
+                {% if i.stok_id %}
+                <span class="badge bg-secondary me-1">Ürün</span>
+                {{ i.marka }} / {{ i.yaygin_ad }}
+                {% else %}
+                <span class="badge bg-primary me-1">Kategori</span>
+                {{ i.kategori }}
+                {% endif %}
+              </td>
+              <td><span class="badge bg-success fs-6">%{{ i.oran }}</span></td>
+              <td>
+                <form method="POST">
+                  <input type="hidden" name="action" value="sil">
+                  <input type="hidden" name="iskonto_id" value="{{ i.id }}">
+                  <button class="btn btn-sm btn-outline-danger">Sil</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="card-body text-muted">Henüz iskonto tanımlanmamış.</div>
+      {% endif %}
+    </div>
+    <a href="{{ url_for('admin.musteriler') }}" class="btn btn-outline-secondary mt-3">← Geri</a>
+  </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+function iskontoTurDegis(){
+  var t = document.getElementById('iskontoTur').value;
+  document.getElementById('kategoriDiv').classList.toggle('d-none', t!='kategori');
+  document.getElementById('urunDiv').classList.toggle('d-none', t!='urun');
+}
+</script>
+{% endblock %}

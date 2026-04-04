@@ -46,10 +46,11 @@ def _sec_font(kalin=True):
 
 
 def kargo_etiketi_olustur(kargo_id, alici_adi, alici_adres, alici_telefon, icerik=""):
-    """Yatay A6 @ 200dpi — buyuk font, Turkce uyumlu, barkod yok."""
+    """40x30mm @ 300dpi yatay — kargo etiketi, Turkce uyumlu."""
     os.makedirs(LABELS_DIR, exist_ok=True)
-    W, H = 1165, 827
-    img  = Image.new("RGB",(W,H),"white")
+    W, H = 472, 354   # 40x30 mm @ 300 dpi
+    PAD  = 10
+    img  = Image.new("RGB", (W, H), "white")
     draw = ImageDraw.Draw(img)
     fp_k = _sec_font(True)
     fp_n = _sec_font(False)
@@ -60,85 +61,79 @@ def kargo_etiketi_olustur(kargo_id, alici_adi, alici_adres, alici_telefon, iceri
             except: pass
         return ImageFont.load_default()
 
-    f_firma  = f(fp_k, 62)
-    f_buyuk  = f(fp_k, 54)
-    f_orta_k = f(fp_k, 40)
-    f_orta_n = f(fp_n, 40)
-    f_kucuk_n= f(fp_n, 28)
-    f_etiket = f(fp_k, 22)
-    f_mini   = f(fp_n, 20)
+    f_firma  = f(fp_k, 22)
+    f_baslik = f(fp_k, 20)
+    f_alici  = f(fp_k, 28)
+    f_orta   = f(fp_n, 18)
+    f_kucuk  = f(fp_n, 15)
+    f_mini   = f(fp_n, 13)
 
-    PAD  = 44
+    SH   = 42   # header yüksekliği
     ORTA = W // 2
-    SH   = 96  # header height
 
-    # Cerceve
-    draw.rectangle([(6,6),(W-6,H-6)], outline="black", width=3)
-    draw.rectangle([(6,6),(W-6,SH)],  fill="#1A1917")
+    # ── Çerçeve ───────────────────────────────────────────────────────────
+    draw.rectangle([(2, 2), (W-2, H-2)], outline="black", width=2)
 
-    # Logo
+    # ── Header (koyu arka plan) ───────────────────────────────────────────
+    draw.rectangle([(2, 2), (W-2, SH)], fill="#1A1917")
+
     if os.path.exists(LOGO_PATH):
         try:
             logo = Image.open(LOGO_PATH).convert("RGBA")
-            lh   = SH - 18
+            lh   = SH - 10
             lw   = int(logo.size[0] * lh / logo.size[1])
             logo = logo.resize((lw, lh), Image.Resampling.LANCZOS)
-            wh   = Image.new("RGB", (lw, lh), "white")
-            wh.paste(logo.convert("RGB"), mask=logo.split()[3])
-            img.paste(wh, (PAD, 9))
+            bg   = Image.new("RGB", (lw, lh), "#1A1917")
+            bg.paste(logo.convert("RGB"), mask=logo.split()[3])
+            img.paste(bg, (PAD, 5))
         except:
             pass
 
-    draw.text((W//2, SH//2+4), "ARES OTO ELEKTRONIK",
+    draw.text((W//2, SH//2 + 2), "ARES OTO ELEKTRONIK",
               fill="white", font=f_firma, anchor="mm")
-    draw.line([(ORTA, SH+8),(ORTA, H-6)], fill="#BBBBBB", width=2)
 
-    # SOL — GONDERICI
-    y = SH + PAD
-    draw.text((PAD, y), "GONDERICI", fill="#888888", font=f_etiket)
-    y += 28
-    draw.text((PAD, y), _tr_k(GONDERICI["isim"]), fill="black", font=f_orta_k)
-    y += 50
-    draw.text((PAD, y), f"Anlasma: {GONDERICI['anlasma_kodu']}",
-              fill="#555555", font=f_kucuk_n)
+    # ── Orta dikey ayırıcı ────────────────────────────────────────────────
+    draw.line([(ORTA, SH+4), (ORTA, H-4)], fill="#BBBBBB", width=1)
+
+    # ── SOL — GÖNDERİCİ ──────────────────────────────────────────────────
+    y = SH + 8
+    draw.text((PAD, y), "GONDERICI", fill="#888888", font=f_mini); y += 16
+    draw.text((PAD, y), _tr_k(GONDERICI["isim"]), fill="black", font=f_kucuk); y += 19
+    draw.text((PAD, y), f"Anl: {GONDERICI['anlasma_kodu']}", fill="#555555", font=f_mini); y += 16
+
     if icerik and icerik != "-":
-        y += 42
-        draw.text((PAD, y), "ICERIK", fill="#888888", font=f_etiket)
-        y += 26
-        draw.text((PAD, y), _tr_k(str(icerik))[:36], fill="black", font=f_kucuk_n)
-    draw.text((PAD, H-PAD-34), f"Kargo No: K{kargo_id:06d}",
-              fill="#AAAAAA", font=f_kucuk_n)
-    draw.text((PAD, H-PAD+2), datetime.now().strftime("%d.%m.%Y"),
-              fill="#AAAAAA", font=f_mini)
+        draw.text((PAD, y), "ICERIK:", fill="#888888", font=f_mini); y += 14
+        draw.text((PAD, y), _tr_k(str(icerik))[:22], fill="black", font=f_mini)
 
-    # SAG — ALICI
-    sx = ORTA + PAD
-    y  = SH + PAD
-    draw.text((sx, y), "ALICI", fill="#888888", font=f_etiket)
-    y += 28
-    draw.text((sx, y), _tr_k(alici_adi)[:18], fill="black", font=f_buyuk)
-    y += 68
+    # Kargo no + tarih (sol alt)
+    draw.text((PAD, H-PAD-24), f"K{kargo_id:06d}", fill="#555555", font=f_kucuk)
+    draw.text((PAD, H-PAD- 8), datetime.now().strftime("%d.%m.%Y"), fill="#AAAAAA", font=f_mini)
 
-    adres   = _tr_k(alici_adres)
-    satirlar= []
-    satir   = []
+    # ── SAĞ — ALICI ───────────────────────────────────────────────────────
+    sx = ORTA + 8
+    y  = SH + 8
+    draw.text((sx, y), "ALICI", fill="#888888", font=f_mini); y += 16
+    draw.text((sx, y), _tr_k(alici_adi)[:14], fill="black", font=f_alici); y += 34
+
+    # Adres kelime sarma
+    adres    = _tr_k(alici_adres)
+    satirlar = []
+    satir    = []
     for kelime in adres.split():
         test = " ".join(satir + [kelime])
-        if len(test) <= 26:
+        if len(test) <= 20:
             satir.append(kelime)
         else:
             if satir: satirlar.append(" ".join(satir))
             satir = [kelime]
     if satir: satirlar.append(" ".join(satir))
 
-    for s in satirlar[:4]:
-        draw.text((sx, y), s, fill="black", font=f_orta_n)
-        y += 48
+    for s in satirlar[:3]:
+        draw.text((sx, y), s, fill="black", font=f_kucuk); y += 19
 
     if alici_telefon and alici_telefon != "-":
-        y += 8
-        draw.text((sx, y), f"Tel: {_tr_k(alici_telefon)}",
-                  fill="#333333", font=f_orta_k)
+        y += 4
+        draw.text((sx, y), f"Tel: {_tr_k(alici_telefon)}", fill="#333333", font=f_kucuk)
 
     path = os.path.join(LABELS_DIR, f"kargo_{kargo_id}.png")
     img.save(path)

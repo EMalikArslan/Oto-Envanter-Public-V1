@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}Panel — ARES{% endblock %}
+{% block page_title %}Genel Bakış{% endblock %}
+{% block content %}
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="icon" style="background:#1a3a2a;color:#4ade80;"><i class="bi bi-boxes"></i></div>
+      <div><div class="val text-success">{{ ozet.depoda }}</div><div class="lbl">Depoda</div></div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="icon" style="background:#1e3a5f;color:#60a5fa;"><i class="bi bi-truck"></i></div>
+      <div><div class="val text-info">{{ ozet.turda }}</div><div class="lbl">Turda</div></div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="icon" style="background:#4a1c0e;color:#f87171;"><i class="bi bi-bag-check"></i></div>
+      <div><div class="val text-danger">{{ ozet.bekl_siparis }}</div><div class="lbl">Bekleyen Sipariş</div></div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="icon" style="background:#3a2a0e;color:#fbbf24;"><i class="bi bi-person-exclamation"></i></div>
+      <div><div class="val text-warning">{{ ozet.bekl_kayit }}</div><div class="lbl">Onay Bekleyen</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-3 col-6">
+    <a href="{{ url_for('admin.stok') }}" class="text-decoration-none">
+      <div class="stat-card h-100">
+        <div class="icon" style="background:#2a1f1f;color:#C0392B;"><i class="bi bi-boxes"></i></div>
+        <div><div class="val">{{ ozet.toplam_urun }}</div><div class="lbl">Toplam Ürün Kalemi</div></div>
+      </div>
+    </a>
+  </div>
+  <div class="col-md-3 col-6">
+    <div class="stat-card h-100">
+      <div class="icon" style="background:#2a2a1f;color:#fbbf24;"><i class="bi bi-check2-circle"></i></div>
+      <div><div class="val">{{ ozet.satildi }}</div><div class="lbl">Satılan Birim</div></div>
+    </div>
+  </div>
+  <div class="col-md-3 col-6">
+    <a href="{{ url_for('admin.kargo') }}" class="text-decoration-none">
+      <div class="stat-card h-100">
+        <div class="icon" style="background:#1f2a2a;color:#67e8f9;"><i class="bi bi-truck-front"></i></div>
+        <div><div class="val">{{ ozet.toplam_kargo }}</div><div class="lbl">Toplam Kargo</div></div>
+      </div>
+    </a>
+  </div>
+  <div class="col-md-3 col-6">
+    <div class="stat-card h-100">
+      <form method="POST" action="{{ url_for('admin.sheets_sync') }}">
+        <button type="submit" class="btn btn-sm btn-outline-secondary w-100">
+          <i class="bi bi-cloud-upload me-1"></i> Sheets Sync
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% if ozet.bekl_siparis > 0 %}
+<div class="alert alert-warning d-flex align-items-center gap-2">
+  <i class="bi bi-exclamation-triangle-fill"></i>
+  <div><strong>{{ ozet.bekl_siparis }} bekleyen sipariş</strong> var.
+    <a href="{{ url_for('admin.siparisler') }}" class="alert-link">Görüntüle →</a>
+  </div>
+</div>
+{% endif %}
+
+{% if ozet.bekl_kayit > 0 %}
+<div class="alert alert-info d-flex align-items-center gap-2">
+  <i class="bi bi-person-plus-fill"></i>
+  <div><strong>{{ ozet.bekl_kayit }} yeni kayıt isteği</strong> onay bekliyor.
+    <a href="{{ url_for('admin.musteriler') }}" class="alert-link">İncele →</a>
+  </div>
+</div>
+{% endif %}
+
+{% if son_hareketler %}
+<div class="card mt-2">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-clock-history me-2"></i>Son Hareketler</span>
+    <a href="{{ url_for('admin.hareketler') }}" class="btn btn-sm btn-outline-secondary">Tümü</a>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm mb-0">
+      <thead><tr><th>Tarih</th><th>Tür</th><th>Ürün</th><th>Adet</th><th>Tutar</th></tr></thead>
+      <tbody>
+        {% for h in son_hareketler %}
+        <tr>
+          <td class="text-muted small">{{ h.tarih[:16] if h.tarih else '-' }}</td>
+          <td><span class="badge bg-secondary">{{ h.tur or '-' }}</span></td>
+          <td>{{ h.marka }} / {{ h.yaygin_ad }}</td>
+          <td>{{ h.adet or 1 }}</td>
+          <td>{{ h.toplam_tutar or '-' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

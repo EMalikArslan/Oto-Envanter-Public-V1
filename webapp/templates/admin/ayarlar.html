@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Ayarlar — ARES{% endblock %}
+{% block page_title %}Sistem Ayarları{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+<div class="col-lg-6">
+  <div class="card">
+    <div class="card-header"><i class="bi bi-google me-2"></i>Google Sheets Entegrasyonu</div>
+    <div class="card-body">
+      <form method="POST">
+        <div class="mb-3">
+          <label class="form-label">Google Sheets URL</label>
+          <input type="url" name="sheet_url" class="form-control"
+                 value="{{ sheet_url }}" placeholder="https://docs.google.com/spreadsheets/d/...">
+          <div class="form-text">Sheets dosyasını Google Drive'dan paylaşıp URL'yi buraya yapıştırın.</div>
+        </div>
+        <button type="submit" class="btn btn-ares">Kaydet</button>
+        <a href="{{ url_for('admin.sheets_sync') }}" class="btn btn-outline-secondary ms-2"
+           onclick="this.closest('form').submit(); return false;">Manuel Sync</a>
+      </form>
+    </div>
+  </div>
+</div>
+</div>
+{% endblock %}

@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Kullanıcılar — ARES{% endblock %}
+{% block page_title %}Kullanıcı Yönetimi{% endblock %}
+{% block content %}
+<div class="row g-3">
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header">Yeni Kullanıcı Ekle</div>
+      <div class="card-body">
+        <form method="POST" action="{{ url_for('admin.kullanici_ekle') }}">
+          <div class="mb-2">
+            <label class="form-label">Ad Soyad *</label>
+            <input type="text" name="ad_soyad" class="form-control" required>
+          </div>
+          <div class="mb-2">
+            <label class="form-label">E-posta *</label>
+            <input type="email" name="email" class="form-control" required>
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Telefon</label>
+            <input type="text" name="telefon" class="form-control">
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Şifre *</label>
+            <input type="password" name="sifre" class="form-control" required minlength="6">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Rol *</label>
+            <select name="rol" class="form-select">
+              <option value="calisan">Çalışan</option>
+              <option value="musteri">Müşteri</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-ares w-100">Ekle</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="table-responsive">
+        <table id="kulTablo" class="table mb-0">
+          <thead><tr><th>Ad Soyad</th><th>E-posta</th><th>Rol</th><th>Kayıt</th><th>Durum</th><th></th></tr></thead>
+          <tbody>
+            {% for u in rows %}
+            <tr>
+              <td class="fw-600">{{ u.ad_soyad }}</td>
+              <td>{{ u.email }}</td>
+              <td><span class="badge bg-{{ 'danger' if u.rol=='admin' else 'primary' if u.rol=='calisan' else 'secondary' }}">{{ u.rol }}</span></td>
+              <td class="text-muted small">{{ u.olusturma[:10] }}</td>
+              <td>{% if u.aktif %}<span class="badge badge-depoda">Aktif</span>{% else %}<span class="badge badge-bekl">Pasif</span>{% endif %}</td>
+              <td>
+                {% if u.id != current_user.id %}
+                <form method="POST" action="{{ url_for('admin.kullanici_toggle', kid=u.id) }}">
+                  <button class="btn btn-sm btn-outline-{{ 'danger' if u.aktif else 'success' }}">
+                    {{ 'Devre Dışı' if u.aktif else 'Aktifleştir' }}
+                  </button>
+                </form>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block extra_js %}<script>$('#kulTablo').DataTable();</script>{% endblock %}

@@ -84,6 +84,30 @@ class ImportThread(QThread):
             self.hata.emit(str(e))
 
 
+# ── Etiket Oluşturma Thread (UI donmasını önler) ──────────────────────────
+class EtiketThread(QThread):
+    bitti    = pyqtSignal(str, str)   # (barkod_id, dosya_yolu)
+    hata     = pyqtSignal(str, str)   # (barkod_id, hata_mesaji)
+
+    def __init__(self, barkod_id, stok_id, kategori, marka, ad, secili_refler):
+        super().__init__()
+        self.barkod_id     = barkod_id
+        self.stok_id       = stok_id
+        self.kategori      = kategori
+        self.marka         = marka
+        self.ad            = ad
+        self.secili_refler = secili_refler
+
+    def run(self):
+        try:
+            yol = etiket_olustur(self.barkod_id, self.stok_id,
+                                  self.kategori, self.marka,
+                                  self.ad, self.secili_refler)
+            self.bitti.emit(self.barkod_id, yol)
+        except Exception as e:
+            self.hata.emit(self.barkod_id, str(e))
+
+
 # ── Ref Seçim Dialog ──────────────────────────────────────────────────────
 
 class StokYuklemeThread(QThread):
@@ -267,12 +291,24 @@ class StokDialog(QDialog):
             self.refs.append(w)
         self.fiyat  = satir("Fiyat",    QLineEdit(kayit["fiyat"] if kayit else ""))
 
-        # Adet — sadece yeni ürün eklerken
+        # Adet kontrolü
         if not kayit:
-            self.adet_sb = satir("Adet (fiziksel)", QSpinBox())
+            self.adet_sb  = satir("Adet (fiziksel)", QSpinBox())
             self.adet_sb.setRange(1, 999); self.adet_sb.setValue(1)
+            self.ekle_sb  = None
+            self.cikar_sb = None
         else:
             self.adet_sb = None
+            lay.addWidget(AyiriciCizgi())
+            lbl_stok = QLabel("Stok Birimi Değiştir")
+            lbl_stok.setStyleSheet(f"font-size:12px; font-weight:700; color:{RENK['metin2']};")
+            lay.addWidget(lbl_stok)
+            self.ekle_sb = satir("Birim Ekle (+)", QSpinBox())
+            self.ekle_sb.setRange(0, 999); self.ekle_sb.setValue(0)
+            self.ekle_sb.setToolTip("Depoya eklenecek yeni fiziksel birim sayısı")
+            self.cikar_sb = satir("Birim Çıkar (−)", QSpinBox())
+            self.cikar_sb.setRange(0, 999); self.cikar_sb.setValue(0)
+            self.cikar_sb.setToolTip("Depodan çıkarılacak (SATILDI olarak işaretlenecek) birim sayısı")
 
         lay.addWidget(AyiriciCizgi())
         btn_lay = QHBoxLayout()
@@ -306,6 +342,10 @@ class StokSayfasi(QWidget):
         self.df = pd.DataFrame()
         self._build_ui()
         self.yukle()
+        # Otomatik Google Sheets sync — her 20 dakikada bir
+        self._sync_timer = QTimer(self)
+        self._sync_timer.timeout.connect(self._silent_sheets_sync)
+        self._sync_timer.start(20 * 60 * 1000)
 
     def _build_ui(self):
         ana = QVBoxLayout(self)
@@ -533,22 +573,37 @@ class StokSayfasi(QWidget):
         conn=get_conn()
         conn.execute("UPDATE stok SET kategori=?,marka=?,yaygin_ad=?,motor=?,ref1=?,ref2=?,ref3=?,ref4=?,ref5=?,fiyat=?,guncelleme=datetime('now','localtime') WHERE id=?",
             (d["kategori"],d["marka"],d["yaygin_ad"],d["motor"],d["ref1"],d["ref2"],d["ref3"],d["ref4"],d["ref5"],d["fiyat"],sid))
-        conn.commit(); conn.close(); self.yukle()
+        conn.commit(); conn.close()
+        stok_miktari_guncelle(sid)
+        self._silent_sheets_sync()
+        self.yukle()
 
-    def stok_sheets_gonder(self):
-        sheets = get_sheets()
-        if not sheets.aktif:
-            QMessageBox.warning(self,"Sheets","Ayarlar'dan baglanti kurun."); return
-        conn=get_conn()
-        rows=conn.execute("""SELECT s.id,s.kategori,s.marka,s.yaygin_ad,s.motor,s.ref1,s.ref2,s.ref3,s.ref4,s.ref5,s.fiyat,
+    def _stok_satirlari(self):
+        conn = get_conn()
+        rows = conn.execute("""SELECT s.id,s.kategori,s.marka,s.yaygin_ad,s.motor,
+                   s.ref1,s.ref2,s.ref3,s.ref4,s.ref5,s.fiyat,
                    COALESCE(d.n,0),COALESCE(t.n,0),s.guncelleme
             FROM stok s
             LEFT JOIN (SELECT stok_id,COUNT(*) n FROM stok_birimi WHERE durum='DEPODA' GROUP BY stok_id) d ON d.stok_id=s.id
             LEFT JOIN (SELECT stok_id,COUNT(*) n FROM stok_birimi WHERE durum='TURDA'  GROUP BY stok_id) t ON t.stok_id=s.id
             ORDER BY s.kategori,s.marka,CAST(s.id AS INTEGER)""").fetchall()
         conn.close()
-        sheets.stok_genel_yenile([list(r) for r in rows])
+        return [list(r) for r in rows]
+
+    def stok_sheets_gonder(self):
+        sheets = get_sheets()
+        if not sheets.aktif:
+            QMessageBox.warning(self,"Sheets","Ayarlar'dan baglanti kurun."); return
+        rows = self._stok_satirlari()
+        sheets.stok_genel_yenile(rows)
         QMessageBox.information(self,"Gonderildi",f"{len(rows)} urun Sheets'e eklendi.")
+
+    def _silent_sheets_sync(self):
+        """Kullanıcıya bildirim göstermeden arka planda Sheets'e sync eder."""
+        sheets = get_sheets()
+        if not sheets.aktif: return
+        rows = self._stok_satirlari()
+        sheets.stok_genel_yenile(rows)
 
     def _birim_goster(self):
         sid = self._get_secili_stok_id()
@@ -594,10 +649,13 @@ class StokSayfasi(QWidget):
         conn.commit(); conn.close(); self.yukle()
 
     def etiketle(self):
-        """Seçili ürünlerin ETİKETSİZ birimlerini toplu etiketle."""
+        """Seçili ürünlerin ETİKETSİZ birimlerini toplu etiketle (arka planda)."""
         rows = self.tablo.selectionModel().selectedRows()
-        if not rows: QMessageBox.information(self, "Bilgi", "Önce satır seçin."); return
-        basarili = 0
+        if not rows:
+            QMessageBox.information(self, "Bilgi", "Önce satır seçin."); return
+
+        # Tüm birim verilerini ana thread'de topla (DB sorguları hızlıdır)
+        gorevler = []   # [(barkod_id, stok_id, kat, marka, ad, secili, birim_db_id), ...]
         conn = get_conn()
         for r in rows:
             sid = int(self.tablo.item(r.row(), 0).text())
@@ -608,29 +666,80 @@ class StokSayfasi(QWidget):
             dlg = RefSecimDialog(refs, self)
             if dlg.exec() != QDialog.DialogCode.Accepted: continue
             secili = dlg.get_secili()
-            # Etiketsiz birimleri bul
             birimler = conn.execute(
                 "SELECT * FROM stok_birimi WHERE stok_id=? AND etiket_basildi='HAYIR' AND durum='DEPODA'",
                 (sid,)).fetchall()
             for birim in birimler:
-                try:
-                    yol = etiket_olustur(birim["barkod_id"], sid,
-                                          stok["kategori"], stok["marka"],
-                                          stok["yaygin_ad"], secili)
-                    conn.execute("UPDATE stok_birimi SET etiket_basildi='EVET' WHERE id=?",
-                                 (birim["id"],))
-                    ok, _ = yazici_gonder(yol, yazici_listesi()[0] if yazici_listesi() else None)
-                    if not ok:
-                        import subprocess as sp, sys as _sys
-                        if _sys.platform == "win32": os.startfile(os.path.dirname(yol))
-                        else: sp.Popen(["xdg-open", os.path.dirname(yol)])
-                    basarili += 1
-                except Exception as e:
-                    QMessageBox.critical(self, "Hata", str(e))
-        conn.commit(); conn.close()
-        if basarili:
-            self.yukle()
-            QMessageBox.information(self, "Tamamlandı", f"✓ {basarili} etiket oluşturuldu.")
+                gorevler.append((birim["barkod_id"], sid,
+                                  stok["kategori"], stok["marka"],
+                                  stok["yaygin_ad"], secili, birim["id"]))
+        conn.close()
+
+        if not gorevler: return
+
+        # İlerleme dialog'u
+        from PyQt6.QtWidgets import QProgressDialog
+        progress = QProgressDialog(f"Etiket oluşturuluyor... (0/{len(gorevler)})",
+                                   None, 0, len(gorevler), self)
+        progress.setWindowModality(Qt.WindowModality.WindowModal)
+        progress.setMinimumDuration(0); progress.setValue(0)
+
+        self._etiket_threads   = []
+        self._etiket_basarili  = 0
+        self._etiket_toplam    = len(gorevler)
+        self._etiket_bitti_cnt = 0
+        self._etiket_progress  = progress
+
+        def _birim_bitti(barkod_id, yol, birim_db_id):
+            c = get_conn()
+            c.execute("UPDATE stok_birimi SET etiket_basildi='EVET' WHERE id=?", (birim_db_id,))
+            c.commit(); c.close()
+            yazicilar = yazici_listesi()
+            ok, _ = yazici_gonder(yol, yazicilar[0] if yazicilar else None)
+            if not ok:
+                import subprocess as sp, sys as _sys
+                if _sys.platform == "win32": os.startfile(os.path.dirname(yol))
+                else: sp.Popen(["xdg-open", os.path.dirname(yol)])
+            self._etiket_basarili  += 1
+            self._etiket_bitti_cnt += 1
+            progress.setValue(self._etiket_bitti_cnt)
+            progress.setLabelText(
+                f"Etiket oluşturuluyor... ({self._etiket_bitti_cnt}/{self._etiket_toplam})")
+            if self._etiket_bitti_cnt >= self._etiket_toplam:
+                self.yukle()
+                QMessageBox.information(self, "Tamamlandı",
+                                        f"✓ {self._etiket_basarili} etiket oluşturuldu.")
+
+        def _birim_hata(barkod_id, mesaj):
+            self._etiket_bitti_cnt += 1
+            progress.setValue(self._etiket_bitti_cnt)
+            QMessageBox.critical(self, "Hata", f"{barkod_id}: {mesaj}")
+            if self._etiket_bitti_cnt >= self._etiket_toplam:
+                self.yukle()
+
+        # Her birimi kendi thread'inde oluştur (sıralı: bir sonraki bir önceki bitince)
+        # Basit yaklaşım: her birimi arka plan thread'inde sırayla işle
+        self._etiket_kuyruk = list(gorevler)
+        self._etiket_bitti_cb  = _birim_bitti
+        self._etiket_hata_cb   = _birim_hata
+        self._etiket_progress  = progress
+        self._etiket_ileri()
+
+    def _etiket_ileri(self):
+        """Kuyruktaki bir sonraki birimi thread'de işler."""
+        if not self._etiket_kuyruk: return
+        barkod_id, sid, kat, marka, ad, secili, birim_db_id = self._etiket_kuyruk.pop(0)
+        t = EtiketThread(barkod_id, sid, kat, marka, ad, secili)
+        def _bitti(bid, yol, dbid=birim_db_id):
+            self._etiket_bitti_cb(bid, yol, dbid)
+            self._etiket_ileri()
+        def _hata(bid, msg):
+            self._etiket_hata_cb(bid, msg)
+            self._etiket_ileri()
+        t.bitti.connect(_bitti)
+        t.hata.connect(_hata)
+        self._etiket_threads.append(t)
+        t.start()
 
     def import_csv(self):
         dosyalar, _ = QFileDialog.getOpenFileNames(

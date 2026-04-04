@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Siparişler — ARES{% endblock %}
+{% block page_title %}Siparişler{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="table-responsive">
+    <table id="siparisTablo" class="table mb-0">
+      <thead><tr><th>#</th><th>Müşteri</th><th>E-posta</th><th>Kalem</th><th>Toplam</th><th>Durum</th><th>Tarih</th><th></th></tr></thead>
+      <tbody>
+        {% for s in rows %}
+        <tr>
+          <td class="fw-700">#{{ s.id }}</td>
+          <td>{{ s.ad_soyad }}</td>
+          <td class="text-muted small">{{ s.email }}</td>
+          <td>{{ s.kalem_sayisi }}</td>
+          <td>{{ '%.2f ₺'|format(s.toplam) if s.toplam else '—' }}</td>
+          <td>
+            {% set renk = {'beklemede':'warning','onaylandi':'info','hazirlaniyor':'primary','kargolandi':'success','iptal':'danger'} %}
+            <span class="badge bg-{{ renk.get(s.durum,'secondary') }}">{{ s.durum }}</span>
+          </td>
+          <td class="text-muted small">{{ s.olusturma[:16] }}</td>
+          <td><a href="{{ url_for('admin.siparis_detay', spid=s.id) }}" class="btn btn-sm btn-outline-secondary">Detay</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+{% block extra_js %}<script>$('#siparisTablo').DataTable({order:[[0,'desc']})</script>{% endblock %}

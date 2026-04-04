@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Müşteriler — ARES{% endblock %}
+{% block page_title %}Müşteriler{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="card-header">Müşteri Listesi</div>
+  <div class="table-responsive">
+    <table id="musteriTablo" class="table mb-0">
+      <thead><tr><th>ID</th><th>Ad Soyad</th><th>E-posta</th><th>Telefon</th><th>Kayıt</th><th>Durum</th><th></th></tr></thead>
+      <tbody>
+        {% for m in rows %}
+        <tr>
+          <td class="text-muted small">{{ m.id }}</td>
+          <td class="fw-600">{{ m.ad_soyad }}</td>
+          <td>{{ m.email }}</td>
+          <td>{{ m.telefon or '—' }}</td>
+          <td class="text-muted small">{{ m.olusturma[:10] }}</td>
+          <td>
+            {% if m.aktif %}
+            <span class="badge badge-depoda">Aktif</span>
+            {% else %}
+            <span class="badge badge-bekl">Beklemede</span>
+            {% endif %}
+          </td>
+          <td class="text-end pe-3">
+            <div class="d-flex gap-1 justify-content-end">
+              {% if not m.aktif %}
+              <form method="POST" action="{{ url_for('admin.musteri_onayla', mid=m.id) }}">
+                <button class="btn btn-sm btn-success">✓ Onayla</button>
+              </form>
+              <form method="POST" action="{{ url_for('admin.musteri_reddet', mid=m.id) }}"
+                    onsubmit="return confirm('Sil?')">
+                <button class="btn btn-sm btn-outline-danger">Reddet</button>
+              </form>
+              {% else %}
+              <a href="{{ url_for('admin.musteri_iskonto', mid=m.id) }}"
+                 class="btn btn-sm btn-outline-warning">
+                <i class="bi bi-percent"></i> İskonto
+              </a>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+{% block extra_js %}<script>$('#musteriTablo').DataTable();</script>{% endblock %}

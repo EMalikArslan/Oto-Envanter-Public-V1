@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="tr" data-bs-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}ARES Envanter{% endblock %}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+  <style>
+    :root {
+      --ares-kirmizi: #C0392B;
+      --ares-koyu:    #1A1917;
+    }
+    body { background:#111; color:#e8e8e8; font-family:'Segoe UI',system-ui,sans-serif; }
+
+    /* Sidebar */
+    #sidebar {
+      width:240px; min-height:100vh; background:var(--ares-koyu);
+      border-right:1px solid #2a2a2a; position:fixed; top:0; left:0; z-index:100;
+      display:flex; flex-direction:column;
+    }
+    #sidebar .brand {
+      padding:20px 16px 16px; border-bottom:1px solid #2a2a2a;
+      display:flex; align-items:center; gap:10px;
+    }
+    #sidebar .brand span { font-size:1.2rem; font-weight:700; color:#fff; }
+    #sidebar .brand small { color:#888; font-size:.7rem; display:block; }
+    #sidebar .nav-link {
+      color:#aaa; padding:10px 20px; border-radius:0;
+      display:flex; align-items:center; gap:10px; font-size:.9rem;
+      transition:all .15s;
+    }
+    #sidebar .nav-link:hover, #sidebar .nav-link.active {
+      color:#fff; background:rgba(192,57,43,.15);
+      border-left:3px solid var(--ares-kirmizi);
+    }
+    #sidebar .nav-link i { font-size:1.1rem; width:20px; text-align:center; }
+    #sidebar .section-label {
+      padding:16px 20px 6px; font-size:.65rem; font-weight:700;
+      color:#555; letter-spacing:.1em; text-transform:uppercase;
+    }
+    #sidebar .sidebar-footer {
+      margin-top:auto; padding:12px 16px; border-top:1px solid #2a2a2a;
+      font-size:.8rem; color:#666;
+    }
+
+    /* Content */
+    #content { margin-left:240px; min-height:100vh; }
+    .topbar {
+      background:var(--ares-koyu); border-bottom:1px solid #2a2a2a;
+      padding:12px 24px; display:flex; align-items:center; justify-content:space-between;
+      position:sticky; top:0; z-index:99;
+    }
+    .topbar .page-title { font-size:1rem; font-weight:600; margin:0; }
+    .main-content { padding:24px; }
+
+    /* Cards */
+    .card { background:#1a1a1a; border:1px solid #2a2a2a; border-radius:10px; }
+    .card-header { background:#1f1f1f; border-bottom:1px solid #2a2a2a; font-weight:600; }
+
+    /* Stat kartları */
+    .stat-card {
+      background:#1a1a1a; border:1px solid #2a2a2a; border-radius:10px;
+      padding:18px 20px; display:flex; align-items:center; gap:16px;
+    }
+    .stat-card .icon {
+      width:48px; height:48px; border-radius:10px;
+      display:flex; align-items:center; justify-content:center; font-size:1.4rem;
+    }
+    .stat-card .val { font-size:1.6rem; font-weight:700; line-height:1; }
+    .stat-card .lbl { font-size:.78rem; color:#888; margin-top:2px; }
+
+    /* Tablo */
+    .table { color:#ddd; }
+    .table thead th { background:#1f1f1f; border-bottom:2px solid #333; font-size:.78rem;
+                      text-transform:uppercase; letter-spacing:.05em; color:#888; }
+    .table tbody tr:hover { background:rgba(255,255,255,.03); }
+    .dataTables_wrapper .dataTables_filter input,
+    .dataTables_wrapper .dataTables_length select {
+      background:#2a2a2a; border:1px solid #3a3a3a; color:#ddd; border-radius:6px; padding:4px 8px;
+    }
+    .dataTables_wrapper .dataTables_info,
+    .dataTables_wrapper .dataTables_paginate .paginate_button { color:#888 !important; }
+    .dataTables_wrapper .dataTables_paginate .paginate_button.current {
+      background:var(--ares-kirmizi) !important; border-color:var(--ares-kirmizi) !important; color:#fff !important;
+    }
+
+    /* Badges */
+    .badge-depoda  { background:#1a4731; color:#4ade80; }
+    .badge-turda   { background:#1e3a5f; color:#60a5fa; }
+    .badge-satildi { background:#2a2a2a; color:#888; }
+    .badge-bekl    { background:#4a1c0e; color:#f87171; }
+
+    /* Butonlar */
+    .btn-ares { background:var(--ares-kirmizi); color:#fff; border:none; }
+    .btn-ares:hover { background:#a93226; color:#fff; }
+
+    /* Form */
+    .form-control, .form-select {
+      background:#2a2a2a; border:1px solid #3a3a3a; color:#ddd;
+    }
+    .form-control:focus, .form-select:focus {
+      background:#2a2a2a; border-color:var(--ares-kirmizi); color:#ddd;
+      box-shadow:0 0 0 .2rem rgba(192,57,43,.25);
+    }
+    .form-label { font-size:.85rem; color:#aaa; font-weight:500; }
+
+    /* Modal */
+    .modal-content { background:#1a1a1a; border:1px solid #333; }
+    .modal-header  { border-bottom:1px solid #333; }
+    .modal-footer  { border-top:1px solid #333; }
+
+    /* Flash */
+    .alert { border-radius:8px; font-size:.9rem; }
+
+    /* Responsive */
+    @media(max-width:768px){
+      #sidebar{ transform:translateX(-100%); transition:.3s; }
+      #sidebar.show{ transform:translateX(0); }
+      #content{ margin-left:0; }
+    }
+  </style>
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+{% if current_user.is_authenticated %}
+<!-- Sidebar -->
+<nav id="sidebar">
+  <div class="brand">
+    <div style="width:36px;height:36px;background:var(--ares-kirmizi);border-radius:8px;
+                display:flex;align-items:center;justify-content:center;font-weight:900;color:#fff;">A</div>
+    <div>
+      <span>ARES</span>
+      <small>Oto Elektronik</small>
+    </div>
+  </div>
+
+  {% if current_user.is_calisan %}
+  <div class="section-label">Yönetim</div>
+  <a href="{{ url_for('admin.dashboard') }}"
+     class="nav-link {% if request.endpoint == 'admin.dashboard' %}active{% endif %}">
+    <i class="bi bi-grid-3x3-gap"></i> Panel
+  </a>
+  <a href="{{ url_for('admin.stok') }}"
+     class="nav-link {% if 'stok' in request.endpoint %}active{% endif %}">
+    <i class="bi bi-boxes"></i> Stok
+  </a>
+  <a href="{{ url_for('admin.hareketler') }}"
+     class="nav-link {% if 'hareket' in request.endpoint %}active{% endif %}">
+    <i class="bi bi-arrow-left-right"></i> Hareketler
+  </a>
+  <a href="{{ url_for('admin.kargo') }}"
+     class="nav-link {% if 'kargo' in request.endpoint %}active{% endif %}">
+    <i class="bi bi-truck"></i> Kargo
+  </a>
+  <a href="{{ url_for('admin.turlar') }}"
+     class="nav-link {% if 'tur' in request.endpoint %}active{% endif %}">
+    <i class="bi bi-geo-alt"></i> Turlar
+  </a>
+  <a href="{{ url_for('admin.musteriler') }}"
+     class="nav-link {% if 'musteri' in request.endpoint and 'admin' in request.endpoint %}active{% endif %}">
+    <i class="bi bi-people"></i> Müşteriler
+  </a>
+  <a href="{{ url_for('admin.siparisler') }}"
+     class="nav-link {% if 'siparis' in request.endpoint %}active{% endif %}">
+    <i class="bi bi-bag-check"></i> Siparişler
+  </a>
+
+  {% if current_user.is_admin %}
+  <div class="section-label">Admin</div>
+  <a href="{{ url_for('admin.kullanicilar') }}"
+     class="nav-link {% if 'kullanici' in request.endpoint %}active{% endif %}">
+    <i class="bi bi-person-gear"></i> Kullanıcılar
+  </a>
+  <a href="{{ url_for('admin.ayarlar') }}"
+     class="nav-link {% if 'ayar' in request.endpoint %}active{% endif %}">
+    <i class="bi bi-gear"></i> Ayarlar
+  </a>
+  {% endif %}
+
+  {% else %}
+  <div class="section-label">Hesabım</div>
+  <a href="{{ url_for('musteri.dashboard') }}"
+     class="nav-link {% if request.endpoint == 'musteri.dashboard' %}active{% endif %}">
+    <i class="bi bi-house"></i> Ana Sayfa
+  </a>
+  <a href="{{ url_for('musteri.urunler') }}"
+     class="nav-link {% if 'urun' in request.endpoint %}active{% endif %}">
+    <i class="bi bi-grid"></i> Ürünler
+  </a>
+  <a href="{{ url_for('musteri.siparislerim') }}"
+     class="nav-link {% if 'siparis' in request.endpoint %}active{% endif %}">
+    <i class="bi bi-bag"></i> Siparişlerim
+  </a>
+  {% endif %}
+
+  <div class="sidebar-footer">
+    <div class="fw-600 text-light">{{ current_user.ad_soyad }}</div>
+    <div>{{ current_user.rol|upper }}</div>
+    <a href="{{ url_for('auth.cikis') }}" class="text-danger text-decoration-none mt-1 d-block">
+      <i class="bi bi-box-arrow-left"></i> Çıkış
+    </a>
+  </div>
+</nav>
+
+<!-- Topbar + Content -->
+<div id="content">
+  <div class="topbar">
+    <div class="d-flex align-items-center gap-3">
+      <button class="btn btn-sm btn-outline-secondary d-md-none" onclick="toggleSidebar()">
+        <i class="bi bi-list"></i>
+      </button>
+      <h6 class="page-title">{% block page_title %}{% endblock %}</h6>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      {% if current_user.is_calisan %}
+      <span class="badge bg-danger">{{ current_user.rol|upper }}</span>
+      {% endif %}
+      <span class="text-muted small">{{ current_user.ad_soyad }}</span>
+    </div>
+  </div>
+
+  <div class="main-content">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}
+        <div class="alert alert-{{ cat }} alert-dismissible fade show" role="alert">
+          {{ msg }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      {% endfor %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+  </div>
+</div>
+
+{% else %}
+<!-- Giriş yapmamış — tam sayfa -->
+{% block fullpage %}{% endblock %}
+{% endif %}
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
+<script>
+function toggleSidebar(){
+  document.getElementById('sidebar').classList.toggle('show');
+}
+// DataTable varsayılan dil
+$.extend(true, $.fn.dataTable.defaults, {
+  language: {
+    search: "Ara:", lengthMenu: "_MENU_ kayıt", info: "_START_–_END_ / _TOTAL_",
+    paginate: { previous: "‹", next: "›" }, zeroRecords: "Kayıt bulunamadı"
+  },
+  pageLength: 50
+});
+</script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

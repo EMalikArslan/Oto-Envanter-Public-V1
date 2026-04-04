@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Turlar — ARES{% endblock %}
+{% block page_title %}Tur Yönetimi{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="table-responsive">
+    <table id="turTablo" class="table mb-0">
+      <thead><tr><th>ID</th><th>Tur Adı</th><th>Başlangıç</th><th>Bitiş</th><th>Durum</th><th>Notlar</th></tr></thead>
+      <tbody>
+        {% for t in rows %}
+        <tr>
+          <td class="text-muted small">{{ t.id }}</td>
+          <td class="fw-600">{{ t.ad if t.ad is defined else t[1] }}</td>
+          <td class="text-muted small">{{ t.baslangic if t.baslangic is defined else '—' }}</td>
+          <td class="text-muted small">{{ t.bitis if t.bitis is defined else '—' }}</td>
+          <td><span class="badge bg-secondary">{{ t.durum if t.durum is defined else '—' }}</span></td>
+          <td class="text-muted small">{{ t.notlar if t.notlar is defined else '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+{% block extra_js %}<script>$('#turTablo').DataTable({order:[[0,'desc']})</script>{% endblock %}
