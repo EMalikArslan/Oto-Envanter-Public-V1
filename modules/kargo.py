@@ -5,9 +5,10 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout,
     QLabel, QLineEdit, QPushButton, QComboBox,
     QTableWidget, QTableWidgetItem, QHeaderView,
-    QAbstractItemView, QFrame, QMessageBox, QDialog
+    QAbstractItemView, QFrame, QMessageBox, QDialog,
+    QTabWidget, QProgressDialog
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QThread, pyqtSignal
 
 from core.database import get_conn
 from core.tema import RENK
@@ -141,6 +142,176 @@ def kargo_etiketi_olustur(kargo_id, alici_adi, alici_adres, alici_telefon, iceri
 
 
 
+# ── Arka plan thread'i (donma önlemi) ────────────────────────────────────────
+class KargoThread(QThread):
+    bitti = pyqtSignal(str, str)   # (kargo_no, dosya_yolu)
+    hata  = pyqtSignal(str)
+
+    def __init__(self, kargo_id, alici_adi, alici_adres, alici_telefon, icerik):
+        super().__init__()
+        self.kargo_id      = kargo_id
+        self.alici_adi     = alici_adi
+        self.alici_adres   = alici_adres
+        self.alici_telefon = alici_telefon
+        self.icerik        = icerik
+
+    def run(self):
+        try:
+            yol = kargo_etiketi_olustur(
+                self.kargo_id, self.alici_adi,
+                self.alici_adres, self.alici_telefon, self.icerik
+            )
+            self.bitti.emit(f"K{self.kargo_id:06d}", yol)
+        except Exception as e:
+            self.hata.emit(str(e))
+
+
+# ── Yeni Kargo Formu ──────────────────────────────────────────────────────────
+class YeniKargoSayfasi(QWidget):
+
+    def __init__(self):
+        super().__init__()
+        self._thread = None
+        self._build()
+
+    def _build(self):
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(24, 20, 24, 20)
+        lay.setSpacing(14)
+
+        baslik = QLabel("Kargo Etiketi Oluştur")
+        baslik.setStyleSheet("font-size:16px;font-weight:bold;color:#fff;")
+        lay.addWidget(baslik)
+
+        form = QFormLayout()
+        form.setSpacing(10)
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+
+        self.alici_adi     = QLineEdit(); self.alici_adi.setPlaceholderText("Alıcı adı soyadı")
+        self.alici_adres   = QLineEdit(); self.alici_adres.setPlaceholderText("Adres")
+        self.alici_telefon = QLineEdit(); self.alici_telefon.setPlaceholderText("05XX XXX XXXX")
+        self.icerik        = QLineEdit(); self.icerik.setPlaceholderText("Ürün / içerik açıklaması")
+
+        form.addRow("Alıcı Adı *",  self.alici_adi)
+        form.addRow("Adres",        self.alici_adres)
+        form.addRow("Telefon",      self.alici_telefon)
+        form.addRow("İçerik",       self.icerik)
+        lay.addLayout(form)
+
+        self.btn = QPushButton("📦  Etiket Oluştur")
+        self.btn.setFixedHeight(40)
+        self.btn.setStyleSheet(
+            "background:#C0392B;color:#fff;font-weight:bold;"
+            "border-radius:6px;font-size:14px;"
+        )
+        self.btn.clicked.connect(self._olustur)
+        lay.addWidget(self.btn)
+
+        self.durum_lbl = QLabel("")
+        self.durum_lbl.setStyleSheet("color:#aaa;font-size:12px;")
+        lay.addWidget(self.durum_lbl)
+        lay.addStretch()
+
+    def guncelle(self): pass
+
+    def _olustur(self):
+        adi = self.alici_adi.text().strip()
+        if not adi:
+            QMessageBox.warning(self, "Eksik", "Alıcı adı zorunludur.")
+            return
+
+        # Veritabanına kaydet
+        try:
+            with get_conn() as conn:
+                cur = conn.execute(
+                    "INSERT INTO kargo (alici_adi, alici_adres, alici_telefon, icerik, durum) "
+                    "VALUES (?,?,?,?,'hazirlaniyor')",
+                    (adi,
+                     self.alici_adres.text().strip(),
+                     self.alici_telefon.text().strip(),
+                     self.icerik.text().strip())
+                )
+                kid = cur.lastrowid
+        except Exception as e:
+            QMessageBox.critical(self, "DB Hatası", str(e))
+            return
+
+        self.btn.setEnabled(False)
+        self.durum_lbl.setText("Etiket oluşturuluyor...")
+
+        self._thread = KargoThread(
+            kid, adi,
+            self.alici_adres.text().strip(),
+            self.alici_telefon.text().strip(),
+            self.icerik.text().strip()
+        )
+        self._thread.bitti.connect(self._bitti)
+        self._thread.hata.connect(self._hata)
+        self._thread.start()
+
+    def _bitti(self, kargo_no, yol):
+        self.btn.setEnabled(True)
+        self.durum_lbl.setText(f"✓ {kargo_no} oluşturuldu")
+        QMessageBox.information(
+            self, "Etiket Hazır",
+            f"Kargo No: {kargo_no}\n\nDosya: {yol}\n\nEtiket klasöründe bulabilirsiniz."
+        )
+        # Formu temizle
+        for w in [self.alici_adi, self.alici_adres, self.alici_telefon, self.icerik]:
+            w.clear()
+
+    def _hata(self, mesaj):
+        self.btn.setEnabled(True)
+        self.durum_lbl.setText("Hata oluştu")
+        QMessageBox.critical(self, "Hata", f"Etiket oluşturulamadı:\n{mesaj}")
+
+
+# ── Kargo Geçmişi Tablosu ─────────────────────────────────────────────────────
+class KargoGecmisiSayfasi(QWidget):
+
+    SUTUNLAR = ["No", "Alıcı", "Adres", "Telefon", "İçerik", "Durum", "Tarih"]
+
+    def __init__(self):
+        super().__init__()
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(16, 12, 16, 12)
+
+        self.tablo = QTableWidget()
+        self.tablo.setColumnCount(len(self.SUTUNLAR))
+        self.tablo.setHorizontalHeaderLabels(self.SUTUNLAR)
+        self.tablo.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.tablo.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.tablo.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.tablo.verticalHeader().setVisible(False)
+        self.tablo.setAlternatingRowColors(True)
+        lay.addWidget(self.tablo)
+
+        self.guncelle()
+
+    def guncelle(self):
+        try:
+            with get_conn() as conn:
+                rows = conn.execute(
+                    "SELECT id, alici_adi, alici_adres, alici_telefon, icerik, durum, "
+                    "olusturma FROM kargo ORDER BY id DESC LIMIT 200"
+                ).fetchall()
+        except Exception:
+            rows = []
+
+        self.tablo.setRowCount(len(rows))
+        for r, row in enumerate(rows):
+            vals = [
+                f"K{row[0]:06d}", row[1] or "", row[2] or "",
+                row[3] or "", row[4] or "", row[5] or "",
+                (row[6] or "")[:16]
+            ]
+            for c, v in enumerate(vals):
+                it = QTableWidgetItem(str(v))
+                it.setFlags(it.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                self.tablo.setItem(r, c, it)
+
+
+# ── Ana Sekme Widget ───────────────────────────────────────────────────────────
 class KargoSayfasi(QWidget):
 
     def __init__(self):
@@ -160,8 +331,8 @@ class KargoSayfasi(QWidget):
         lay.addWidget(self.tabs, 1)
 
     def _sekme(self, idx):
-        if idx == 0: self.yeni_s.guncelle()
-        elif idx == 1: self.gecmis_s.guncelle()
+        if idx == 1:
+            self.gecmis_s.guncelle()
 
     def guncelle(self):
         self._sekme(self.tabs.currentIndex())
