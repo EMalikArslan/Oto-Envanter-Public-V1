@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
     QPushButton, QLineEdit, QComboBox, QLabel, QFileDialog, QMessageBox,
     QDialog, QCheckBox, QFrame, QHeaderView, QAbstractItemView,
-    QSpinBox, QProgressDialog
+    QSpinBox, QProgressDialog, QTabWidget, QScrollArea
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt6.QtGui import QColor, QFont
@@ -264,14 +264,63 @@ class StokDialog(QDialog):
         super().__init__(parent)
         self.kayit = kayit
         self.setWindowTitle("Ürün Düzenle" if kayit else "Yeni Ürün Ekle")
-        self.setMinimumWidth(480)
+        self.setMinimumWidth(520)
+        self.setMinimumHeight(500)
         self.setStyleSheet(f"background:{RENK['yuzey']}; color:{RENK['metin']};")
-        lay = QVBoxLayout(self)
-        lay.setSpacing(10); lay.setContentsMargins(24,24,24,24)
-        lbl = QLabel("Yeni Ürün Ekle" if not kayit else "Ürün Düzenle")
-        lbl.setStyleSheet("font-size:16px; font-weight:700;")
-        lay.addWidget(lbl); lay.addWidget(AyiriciCizgi())
 
+        ana = QVBoxLayout(self)
+        ana.setSpacing(10); ana.setContentsMargins(16, 16, 16, 16)
+
+        if kayit:
+            # Düzenleme: 2 sekme
+            self.tabs = QTabWidget()
+            self.tabs.setDocumentMode(True)
+
+            # ── Sekme 1: Bilgi Düzenleme ──────────────────────────────────
+            bilgi_w = QWidget()
+            bilgi_lay = QVBoxLayout(bilgi_w)
+            bilgi_lay.setContentsMargins(16, 16, 16, 8)
+            self._bilgi_form(bilgi_lay, kayit, kategori)
+
+            # ── Sekme 2: Stok Yönetimi ────────────────────────────────────
+            stok_w = QWidget()
+            stok_lay = QVBoxLayout(stok_w)
+            stok_lay.setContentsMargins(16, 16, 16, 8)
+            self._stok_form(stok_lay, kayit)
+
+            self.tabs.addTab(bilgi_w, "  📝  Bilgi Düzenleme  ")
+            self.tabs.addTab(stok_w,  "  📦  Stok Yönetimi  ")
+            ana.addWidget(self.tabs, 1)
+        else:
+            # Yeni ürün: tek form
+            self.tabs = None
+            w = QWidget()
+            lay = QVBoxLayout(w)
+            lay.setContentsMargins(8, 8, 8, 8)
+            self._bilgi_form(lay, None, kategori)
+            lbl_adet = QLabel("Adet (fiziksel)")
+            lbl_adet.setStyleSheet(f"font-size:12px; font-weight:600; color:{RENK['metin2']};")
+            self.adet_sb = QSpinBox()
+            self.adet_sb.setRange(1, 999); self.adet_sb.setValue(1)
+            row = QHBoxLayout()
+            l = QLabel("Adet (fiziksel)"); l.setFixedWidth(120)
+            l.setStyleSheet(f"font-size:12px; font-weight:600; color:{RENK['metin2']};")
+            row.addWidget(l); row.addWidget(self.adet_sb)
+            lay.addLayout(row)
+            ana.addWidget(w, 1)
+            self.ekle_sb = None
+            self.cikar_sb = None
+
+        # ── Alt butonlar ──────────────────────────────────────────────────
+        ana.addWidget(AyiriciCizgi())
+        btn_lay = QHBoxLayout()
+        bi = QPushButton("İptal"); bi.setObjectName("BtnIkincil"); bi.clicked.connect(self.reject)
+        bk = QPushButton("Kaydet"); bk.setObjectName("BtnAksan"); bk.clicked.connect(self._kaydet)
+        btn_lay.addWidget(bi); btn_lay.addWidget(bk)
+        ana.addLayout(btn_lay)
+
+    def _bilgi_form(self, lay, kayit, kategori):
+        """Kategori, marka, referanslar, fiyat alanları."""
         def satir(et, w):
             row = QHBoxLayout()
             l = QLabel(et); l.setFixedWidth(120)
@@ -281,40 +330,74 @@ class StokDialog(QDialog):
         self.kat_cb = QComboBox(); self.kat_cb.addItems(KATEGORILER)
         self.kat_cb.setCurrentText(kayit["kategori"] if kayit else kategori)
         satir("Kategori", self.kat_cb)
-        self.marka  = satir("Marka",     QLineEdit(kayit["marka"] if kayit else ""))
-        self.ad     = satir("Yaygın Ad", QLineEdit(kayit["yaygin_ad"] if kayit else ""))
-        self.motor  = satir("Motor",     QLineEdit(kayit["motor"] if kayit else ""))
-        self.refs = []
+        self.marka = satir("Marka",     QLineEdit(kayit["marka"] if kayit else ""))
+        self.ad    = satir("Yaygın Ad", QLineEdit(kayit["yaygin_ad"] if kayit else ""))
+        self.motor = satir("Motor",     QLineEdit(kayit["motor"] if kayit else ""))
+        self.refs  = []
         for i in range(1, 6):
-            w = satir(f"Referans {i}", QLineEdit(
-                "" if not kayit or kayit.get(f"ref{i}","") in ("-","") else kayit.get(f"ref{i}","")))
-            self.refs.append(w)
-        self.fiyat  = satir("Fiyat",    QLineEdit(kayit["fiyat"] if kayit else ""))
+            val = "" if not kayit or kayit.get(f"ref{i}", "") in ("-", "") else kayit.get(f"ref{i}", "")
+            self.refs.append(satir(f"Referans {i}", QLineEdit(val)))
+        self.fiyat = satir("Fiyat",     QLineEdit(kayit["fiyat"] if kayit else ""))
+        lay.addStretch()
 
-        # Adet kontrolü
-        if not kayit:
-            self.adet_sb  = satir("Adet (fiziksel)", QSpinBox())
-            self.adet_sb.setRange(1, 999); self.adet_sb.setValue(1)
-            self.ekle_sb  = None
-            self.cikar_sb = None
-        else:
-            self.adet_sb = None
-            lay.addWidget(AyiriciCizgi())
-            lbl_stok = QLabel("Stok Birimi Değiştir")
-            lbl_stok.setStyleSheet(f"font-size:12px; font-weight:700; color:{RENK['metin2']};")
-            lay.addWidget(lbl_stok)
-            self.ekle_sb = satir("Birim Ekle (+)", QSpinBox())
-            self.ekle_sb.setRange(0, 999); self.ekle_sb.setValue(0)
-            self.ekle_sb.setToolTip("Depoya eklenecek yeni fiziksel birim sayısı")
-            self.cikar_sb = satir("Birim Çıkar (−)", QSpinBox())
-            self.cikar_sb.setRange(0, 999); self.cikar_sb.setValue(0)
-            self.cikar_sb.setToolTip("Depodan çıkarılacak (SATILDI olarak işaretlenecek) birim sayısı")
+    def _stok_form(self, lay, kayit):
+        """Birim ekle / çıkar ve mevcut birimler."""
+        def satir(et, w):
+            row = QHBoxLayout()
+            l = QLabel(et); l.setFixedWidth(130)
+            l.setStyleSheet(f"font-size:12px; font-weight:600; color:{RENK['metin2']};")
+            row.addWidget(l); row.addWidget(w); lay.addLayout(row); return w
+
+        self.ekle_sb = satir("Birim Ekle (+)", QSpinBox())
+        self.ekle_sb.setRange(0, 999); self.ekle_sb.setValue(0)
+        self.ekle_sb.setToolTip("Depoya eklenecek yeni fiziksel birim sayısı")
+
+        self.cikar_sb = satir("Birim Çıkar (−)", QSpinBox())
+        self.cikar_sb.setRange(0, 999); self.cikar_sb.setValue(0)
+        self.cikar_sb.setToolTip("Depodan çıkarılacak (SATILDI olarak işaretlenecek) birim sayısı")
 
         lay.addWidget(AyiriciCizgi())
-        btn_lay = QHBoxLayout()
-        bi = QPushButton("İptal"); bi.setObjectName("BtnIkincil"); bi.clicked.connect(self.reject)
-        bk = QPushButton("Kaydet"); bk.setObjectName("BtnAksan"); bk.clicked.connect(self._kaydet)
-        btn_lay.addWidget(bi); btn_lay.addWidget(bk); lay.addLayout(btn_lay)
+
+        # Mevcut birimler tablosu
+        lbl = QLabel("Mevcut Birimler")
+        lbl.setStyleSheet(f"font-size:12px; font-weight:700; color:{RENK['metin2']};")
+        lay.addWidget(lbl)
+
+        from core.database import get_conn as _gc
+        try:
+            with _gc() as conn:
+                birimler = conn.execute(
+                    "SELECT barkod_id, durum FROM stok_birimi WHERE stok_id=? ORDER BY id",
+                    (kayit["id"],)
+                ).fetchall()
+        except Exception:
+            birimler = []
+
+        birim_lay = QHBoxLayout()
+        birim_lay.setSpacing(6)
+        birim_lay.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        durum_renk = {"DEPODA": "#4ade80", "TURDA": "#60a5fa", "SATILDI": "#888888"}
+        for b in birimler:
+            renk = durum_renk.get(b[1] if isinstance(b, tuple) else b["durum"], "#888")
+            lbl_b = QLabel(str(b[0] if isinstance(b, tuple) else b["barkod_id"]))
+            lbl_b.setStyleSheet(
+                f"background:{renk}22; color:{renk}; border:1px solid {renk}55;"
+                f"border-radius:4px; padding:2px 6px; font-size:11px;"
+            )
+            birim_lay.addWidget(lbl_b)
+
+        birim_w = QWidget()
+        birim_w.setLayout(birim_lay)
+
+        scroll = QScrollArea()
+        scroll.setWidget(birim_w)
+        scroll.setWidgetResizable(True)
+        scroll.setMaximumHeight(100)
+        scroll.setStyleSheet("QScrollArea{border:none;}")
+        lay.addWidget(scroll)
+        lay.addStretch()
+
+        self.adet_sb = None
 
     def _kaydet(self):
         if not self.marka.text().strip():
@@ -324,13 +407,14 @@ class StokDialog(QDialog):
     def get_veri(self):
         refs = [r.text().strip() or "-" for r in self.refs]
         return {
-            "kategori": self.kat_cb.currentText(),
-            "marka":    self.marka.text().strip() or "-",
+            "kategori":  self.kat_cb.currentText(),
+            "marka":     self.marka.text().strip() or "-",
             "yaygin_ad": self.ad.text().strip() or "-",
-            "motor":    self.motor.text().strip() or "-",
-            "ref1":refs[0],"ref2":refs[1],"ref3":refs[2],"ref4":refs[3],"ref5":refs[4],
-            "fiyat":    self.fiyat.text().strip() or "-",
-            "adet":     self.adet_sb.value() if self.adet_sb else 1,
+            "motor":     self.motor.text().strip() or "-",
+            "ref1": refs[0], "ref2": refs[1], "ref3": refs[2],
+            "ref4": refs[3], "ref5": refs[4],
+            "fiyat":     self.fiyat.text().strip() or "-",
+            "adet":      self.adet_sb.value() if self.adet_sb else 1,
         }
 
 
