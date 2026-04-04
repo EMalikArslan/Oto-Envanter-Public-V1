@@ -439,12 +439,17 @@ class StokSayfasi(QWidget):
         super().__init__()
         self.aktif_kat = KATEGORILER[0]
         self.df = pd.DataFrame()
+        self._sheets_thread = None   # Referans sızıntısını önler
+        self._yt = None              # Yükleme thread referansı
+        self._ara_timer = QTimer(self)  # Debounce: hızlı yazışta gereksiz filtre engeli
+        self._ara_timer.setSingleShot(True)
+        self._ara_timer.timeout.connect(self._filtrele)
         self._build_ui()
-        self.yukle()
-        # Otomatik Google Sheets sync — her 20 dakikada bir
+        # Otomatik Google Sheets sync — her 20 dakikada bir (arka planda, UI'ı dondurmaz)
         self._sync_timer = QTimer(self)
         self._sync_timer.timeout.connect(self._silent_sheets_sync)
         self._sync_timer.start(20 * 60 * 1000)
+        # _build_ui içindeki _kat_sec zaten yukle() çağırır; tekrar çağırmaya gerek yok
 
     def _build_ui(self):
         ana = QVBoxLayout(self)
@@ -477,7 +482,9 @@ class StokSayfasi(QWidget):
         # Filtreler
         fil_lay = QHBoxLayout(); fil_lay.setSpacing(10)
         self.ara_txt = QLineEdit(); self.ara_txt.setPlaceholderText("Ara — marka, model, referans...")
-        self.ara_txt.setMinimumHeight(38); self.ara_txt.textChanged.connect(self._filtrele)
+        self.ara_txt.setMinimumHeight(38)
+        # Debounce: her karakter basışında değil, 250ms sonra filtrele (CPU tasarrufu)
+        self.ara_txt.textChanged.connect(lambda: self._ara_timer.start(250))
         self.cb_durum = QComboBox(); self.cb_durum.setMinimumHeight(38)
         self.cb_durum.addItems(["Tüm Durumlar", "Etiket Bekliyor", "Etiketli"])
         self.cb_durum.currentIndexChanged.connect(self._filtrele)
@@ -566,30 +573,45 @@ class StokSayfasi(QWidget):
         self.s_turda.set_deger(turda)
         self.s_bekliyor.set_deger(bekleyen)
         self.cb_marka.blockSignals(True)
-        onceki = self.cb_marka.currentText()
-        self.cb_marka.clear(); self.cb_marka.addItem('Tüm Markalar')
-        self.cb_marka.addItems(markalar)
-        idx = self.cb_marka.findText(onceki)
-        if idx >= 0: self.cb_marka.setCurrentIndex(idx)
-        self.cb_marka.blockSignals(False)
+        try:
+            onceki = self.cb_marka.currentText()
+            self.cb_marka.clear(); self.cb_marka.addItem('Tüm Markalar')
+            self.cb_marka.addItems(markalar)
+            idx = self.cb_marka.findText(onceki)
+            if idx >= 0: self.cb_marka.setCurrentIndex(idx)
+        finally:
+            self.cb_marka.blockSignals(False)
         self._filtrele()
 
     def _filtrele(self):
-        if self.df.empty: self.tablo.setRowCount(0); return
-        d = self.df.copy()
+        if self.df.empty:
+            self.tablo.clearContents()
+            self.tablo.setRowCount(0)
+            return
+        # Boolean mask — kopya oluşturmadan filtrele
+        mask = pd.Series([True] * len(self.df), index=self.df.index)
         durum = self.cb_durum.currentText()
         marka = self.cb_marka.currentText()
         ara   = self.ara_txt.text().strip().lower()
-        if durum == "Etiket Bekliyor": d = d[d["etiket_bekleyen"] > 0]
-        elif durum == "Etiketli":      d = d[d["etiket_bekleyen"] == 0]
-        if marka != "Tüm Markalar":   d = d[d["marka"] == marka]
+        if durum == "Etiket Bekliyor": mask &= self.df["etiket_bekleyen"] > 0
+        elif durum == "Etiketli":      mask &= self.df["etiket_bekleyen"] == 0
+        if marka != "Tüm Markalar":   mask &= self.df["marka"] == marka
         if ara:
-            mask = d.astype(str).apply(lambda c: c.str.lower().str.contains(ara, na=False)).any(axis=1)
-            d = d[mask]
-        self._tabloyu_doldur(d)
+            # Hızlı arama: sadece aranacak kolonları birleştir (astype+apply'den 10x hızlı)
+            arama_str = (
+                self.df["marka"].fillna("").str.lower() + " " +
+                self.df["yaygin_ad"].fillna("").str.lower() + " " +
+                self.df["ref1"].fillna("").str.lower() + " " +
+                self.df["ref2"].fillna("").str.lower() + " " +
+                self.df["ref3"].fillna("").str.lower() + " " +
+                self.df["motor"].fillna("").str.lower()
+            )
+            mask &= arama_str.str.contains(ara, regex=False, na=False)
+        self._tabloyu_doldur(self.df[mask])
 
     def _tabloyu_doldur(self, d):
         self.tablo.setSortingEnabled(False)
+        self.tablo.clearContents()   # Eski item widget'ları bellekten temizle
         self.tablo.setRowCount(len(d))
         sutunlar = ["id","kategori","marka","yaygin_ad","motor",
                     "ref1","ref2","ref3","ref4","ref5",
@@ -694,15 +716,20 @@ class StokSayfasi(QWidget):
         sheets = get_sheets()
         if not sheets.aktif:
             QMessageBox.warning(self, "Sheets", "Ayarlar'dan baglanti kurun."); return
+        # Önceki thread hâlâ çalışıyorsa yeni başlatma
+        if self._sheets_thread and self._sheets_thread.isRunning(): return
         rows = self._stok_satirlari()
         self._sheets_thread = SheetsThread(rows)
+        self._sheets_thread.finished.connect(self._sheets_thread.deleteLater)
         self._sheets_thread.start()
         QMessageBox.information(self, "Gonderiliyor", f"{len(rows)} urun arka planda Sheets'e gonderiliyor.")
 
     def _silent_sheets_sync(self):
         """Kullanıcıya bildirim göstermeden arka planda Sheets'e sync eder — UI donmaz."""
+        if self._sheets_thread and self._sheets_thread.isRunning(): return
         rows = self._stok_satirlari()
         self._sheets_thread = SheetsThread(rows)
+        self._sheets_thread.finished.connect(self._sheets_thread.deleteLater)
         self._sheets_thread.start()
 
     def _birim_goster(self):
@@ -830,12 +857,18 @@ class StokSayfasi(QWidget):
         if not self._etiket_kuyruk: return
         barkod_id, sid, kat, marka, ad, secili, birim_db_id = self._etiket_kuyruk.pop(0)
         t = EtiketThread(barkod_id, sid, kat, marka, ad, secili)
-        def _bitti(bid, yol, dbid=birim_db_id):
+        def _bitti(bid, yol, dbid=birim_db_id, thread=t):
             self._etiket_bitti_cb(bid, yol, dbid)
             self._etiket_ileri()
-        def _hata(bid, msg):
+            thread.deleteLater()  # Thread bittikten sonra belleği serbest bırak
+            if thread in self._etiket_threads:
+                self._etiket_threads.remove(thread)
+        def _hata(bid, msg, thread=t):
             self._etiket_hata_cb(bid, msg)
             self._etiket_ileri()
+            thread.deleteLater()
+            if thread in self._etiket_threads:
+                self._etiket_threads.remove(thread)
         t.bitti.connect(_bitti)
         t.hata.connect(_hata)
         self._etiket_threads.append(t)

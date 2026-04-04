@@ -20,13 +20,24 @@ from PyQt6.QtWidgets import (
     QMessageBox, QDialog, QDoubleSpinBox, QSpinBox, QFileDialog,
     QScrollArea, QSizePolicy, QDateEdit
 )
-from PyQt6.QtCore import Qt, QTimer, QDate
+from PyQt6.QtCore import Qt, QTimer, QDate, QThread, pyqtSignal as _Signal
 from PyQt6.QtGui import QColor, QFont
 
 from core.database import get_conn, v, to_int
 from core.tema import RENK
 from core.widgets import StatKart, AyiriciCizgi, Badge
 from core.sheets import get_sheets
+
+
+# ── Sheets arka plan thread'i (UI donmasını önler) ────────────────────────────
+class _SheetsCallThread(QThread):
+    """Herhangi bir sheets callable'ını arka planda çalıştırır."""
+    def __init__(self, fn, *args, **kwargs):
+        super().__init__()
+        self._fn = fn; self._args = args; self._kwargs = kwargs
+    def run(self):
+        try: self._fn(*self._args, **self._kwargs)
+        except Exception: pass
 
 # Hareket tipi renkleri
 TIP_RENK = {
@@ -488,16 +499,19 @@ class HizliSatisSayfasi(QWidget):
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         if cevap != QMessageBox.StandardButton.Yes: return
 
-        # İşlem
+        # İşlem — DB kayıtları main thread'de, sheets sync arka planda
         for stok_id, urun, adet, birim, toplam in satirlar:
             yeni_stok = _stok_guncelle(stok_id, -adet)
             _hareket_kaydet("SATIS", stok_id, adet, birim, toplam,
                            musteri, "", 0, not_, yeni_stok)
             if sheets.aktif:
-                sheets.satis_ekle(
+                t = _SheetsCallThread(
+                    sheets.satis_ekle,
                     stok_id, urun["kategori"], urun["marka"],
                     urun["yaygin_ad"], urun["ref1"],
                     adet, birim, toplam, musteri, not_, yeni_stok)
+                t.finished.connect(t.deleteLater)
+                t.start()
 
         QMessageBox.information(self, "Tamamlandı",
             f"✓ Satış kaydedildi!\nToplam: ₺{toplam_tutar:,.2f}\n"
@@ -664,9 +678,12 @@ class MalGirisSayfasi(QWidget):
 
         sheets = get_sheets()
         if sheets.aktif:
-            sheets.mal_giris_ekle(
+            t = _SheetsCallThread(
+                sheets.mal_giris_ekle,
                 self._mg_stok_id, urun["kategori"], urun["marka"],
                 urun["yaygin_ad"], adet, fiyat, tedarikci, not_, yeni_stok)
+            t.finished.connect(t.deleteLater)
+            t.start()
 
         self._mg_flash_goster(
             f"✓ {adet} adet girişi kaydedildi. Yeni stok: {yeni_stok}",

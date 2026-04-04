@@ -22,6 +22,16 @@ from core.widgets import StatKart, AyiriciCizgi
 from core.sheets import get_sheets
 
 
+# ── Sheets arka plan thread'i ─────────────────────────────────────────────────
+class _SheetsCallThread(QThread):
+    def __init__(self, fn, *args, **kwargs):
+        super().__init__()
+        self._fn = fn; self._args = args; self._kwargs = kwargs
+    def run(self):
+        try: self._fn(*self._args, **self._kwargs)
+        except Exception: pass
+
+
 # ── Barkod giriş kutusu ───────────────────────────────────────────────────
 class BarkodInput(QLineEdit):
     barkod_okundu = pyqtSignal(str)
@@ -295,10 +305,12 @@ class TuraCikisSayfasi(QWidget):
 
         sheets = get_sheets()
         if sheets.aktif:
-            sheets.tura_cikis_ekle(
+            t = _SheetsCallThread(
+                sheets.tura_cikis_ekle,
                 self._tur_adi, stok_id,
                 bilgi.get("kategori",""), bilgi.get("marka",""),
                 bilgi.get("yaygin_ad",""), bilgi.get("ref1",""), barkod_str)
+            t.finished.connect(t.deleteLater); t.start()
         self._flash(f"✓ {bilgi.get('marka','')} / {bilgi.get('yaygin_ad','')} — yüklendi",
                     RENK["yesil"])
         self._tabloyu_yenile()
@@ -526,8 +538,11 @@ class TurDonusSayfasi(QWidget):
         sheets = get_sheets()
         if sheets.aktif:
             r = self._cikanlar[birim_id]
-            sheets.tur_donus_ekle(self._tur_adi, birim_id,
+            t = _SheetsCallThread(
+                sheets.tur_donus_ekle,
+                self._tur_adi, birim_id,
                 r["kategori"], r["marka"], r["yaygin_ad"], "İADE")
+            t.finished.connect(t.deleteLater); t.start()
         self._flash(f"✓ {marka} / {ad} — iade alındı", RENK["yesil"])
         self._tablolari_yenile(); self.arama._ara()
 
@@ -587,14 +602,18 @@ class TurDonusSayfasi(QWidget):
                     "(SELECT COUNT(*) FROM stok_birimi WHERE stok_id=? AND durum='DEPODA'),"
                     "guncelleme=datetime('now','localtime') WHERE id=?", (sid, sid))
             if sheets.aktif:
-                sheets.tur_donus_ekle(self._tur_adi, bid,
+                t = _SheetsCallThread(
+                    sheets.tur_donus_ekle, self._tur_adi, bid,
                     r["kategori"], r["marka"], r["yaygin_ad"],
                     "SATILDI", "Turdan gelmedi")
+                t.finished.connect(t.deleteLater); t.start()
 
         conn.execute("UPDATE tur SET durum='TAMAMLANDI', bitis_tarihi=date('now','localtime') "
                      "WHERE id=?", (self._tur_id,))
         conn.commit(); conn.close()
-        if sheets.aktif: sheets.tur_programi_guncelle(self._tur_adi, "TAMAMLANDI")
+        if sheets.aktif:
+            t2 = _SheetsCallThread(sheets.tur_programi_guncelle, self._tur_adi, "TAMAMLANDI")
+            t2.finished.connect(t2.deleteLater); t2.start()
         QMessageBox.information(self, "Tamam",
             f"✓ Tur kapatıldı. {len(eksik)} ürün stoktan düşüldü.")
         self._turleri_yukle()
@@ -727,8 +746,10 @@ class TurProgramiSayfasi(QWidget):
         conn.commit(); conn.close()
         sheets = get_sheets()
         if sheets.aktif:
-            sheets.tur_programi_ekle(d["tur_adi"], d["baslangic_tarihi"],
-                                     d["bitis_tarihi"], "BEKLIYOR", d["notlar"])
+            t = _SheetsCallThread(
+                sheets.tur_programi_ekle, d["tur_adi"], d["baslangic_tarihi"],
+                d["bitis_tarihi"], "BEKLIYOR", d["notlar"])
+            t.finished.connect(t.deleteLater); t.start()
         self.yukle()
 
     def _sil(self):
