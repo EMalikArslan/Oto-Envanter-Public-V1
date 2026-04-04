@@ -1,0 +1,35 @@
+# Veritabanı (runtime dosyası)
+*.db
+*.sqlite
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# Labels / generated files
+labels/
+*.pdf
+*.png
+
+# Upload klasörü (kullanıcı içerikleri)
+webapp/static/img/urunler/*
+!webapp/static/img/urunler/.gitkeep
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
