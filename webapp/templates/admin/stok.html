@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}Stok — ARES{% endblock %}
+{% block page_title %}Stok Yönetimi{% endblock %}
+{% block extra_head %}
+<style>
+.thumb { width:40px;height:40px;object-fit:cover;border-radius:6px;border:1px solid #333; }
+.thumb-placeholder { width:40px;height:40px;background:#2a2a2a;border-radius:6px;
+                     display:flex;align-items:center;justify-content:center;color:#555; }
+</style>
+{% endblock %}
+{% block content %}
+
+<!-- Kategori sekmeleri -->
+<div class="d-flex gap-2 mb-4 flex-wrap">
+  {% for k in ["Beyin","ABS","Plastik"] %}
+  <a href="?kat={{ k }}"
+     class="btn btn-sm {% if kat == k %}btn-ares{% else %}btn-outline-secondary{% endif %}">
+    {{ k.upper() }}
+  </a>
+  {% endfor %}
+  <a href="{{ url_for('admin.stok_ekle') }}" class="btn btn-sm btn-ares ms-auto">
+    <i class="bi bi-plus-lg me-1"></i>Ürün Ekle
+  </a>
+</div>
+
+<!-- İstatistikler -->
+<div class="row g-2 mb-3">
+  <div class="col-6 col-md-3">
+    <div class="stat-card py-3">
+      <div class="icon" style="background:#1a1a1a;color:#888;"><i class="bi bi-list-ul"></i></div>
+      <div><div class="val">{{ rows|length }}</div><div class="lbl">Ürün Kalemi</div></div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card py-3">
+      <div class="icon" style="background:#1a3a2a;color:#4ade80;"><i class="bi bi-archive"></i></div>
+      <div><div class="val text-success">{{ toplam_depoda }}</div><div class="lbl">Depoda</div></div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card py-3">
+      <div class="icon" style="background:#1e3a5f;color:#60a5fa;"><i class="bi bi-truck"></i></div>
+      <div><div class="val text-info">{{ toplam_turda }}</div><div class="lbl">Turda</div></div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card py-3">
+      <div class="icon" style="background:#4a1c0e;color:#f87171;"><i class="bi bi-tag"></i></div>
+      <div><div class="val text-danger">{{ rows|selectattr('etiket_bekl','gt',0)|list|length }}</div><div class="lbl">Etiket Bekliyor</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Tablo -->
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table id="stokTablo" class="table table-hover mb-0">
+        <thead>
+          <tr>
+            <th>ID</th><th></th><th>MARKA</th><th>YAYGIN AD</th><th>REF 1</th>
+            <th>REF 2</th><th>FİYAT</th><th>DEPODA</th><th>TURDA</th><th>ETİKET</th><th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in rows %}
+          <tr>
+            <td class="text-muted small">{{ r.id }}</td>
+            <td>
+              {% if r.kapak %}
+              <img src="{{ url_for('static', filename='img/urunler/' + r.kapak) }}" class="thumb">
+              {% else %}
+              <div class="thumb-placeholder"><i class="bi bi-image" style="font-size:.8rem;"></i></div>
+              {% endif %}
+            </td>
+            <td class="fw-600">{{ r.marka }}</td>
+            <td>{{ r.yaygin_ad }}</td>
+            <td class="text-muted small">{{ r.ref1 if r.ref1 != '-' else '' }}</td>
+            <td class="text-muted small">{{ r.ref2 if r.ref2 != '-' else '' }}</td>
+            <td>{{ r.fiyat if r.fiyat != '-' else '' }}</td>
+            <td>
+              <span class="badge badge-depoda">{{ r.depoda }}</span>
+            </td>
+            <td>
+              {% if r.turda > 0 %}
+              <span class="badge badge-turda">{{ r.turda }}</span>
+              {% else %}<span class="text-muted">—</span>{% endif %}
+            </td>
+            <td>
+              {% if r.etiket_bekl > 0 %}
+              <span class="badge badge-bekl">⚠ {{ r.etiket_bekl }}</span>
+              {% else %}<span class="text-success small">✓</span>{% endif %}
+            </td>
+            <td class="text-end pe-3">
+              <div class="d-flex gap-1 justify-content-end">
+                {% if r.etiket_bekl > 0 %}
+                <a href="{{ url_for('admin.stok_etiket', sid=r.id) }}"
+                   class="btn btn-sm btn-outline-warning" title="Etiket Oluştur">
+                  <i class="bi bi-printer"></i>
+                </a>
+                {% endif %}
+                <a href="{{ url_for('admin.stok_duzenle', sid=r.id) }}"
+                   class="btn btn-sm btn-outline-secondary" title="Düzenle">
+                  <i class="bi bi-pencil"></i>
+                </a>
+                <form method="POST" action="{{ url_for('admin.stok_sil', sid=r.id) }}"
+                      onsubmit="return confirm('{{ r.marka }} silinsin mi?')">
+                  <button class="btn btn-sm btn-outline-danger" title="Sil">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+$('#stokTablo').DataTable({ order:[[0,'asc']], columnDefs:[{orderable:false,targets:[1,10]}] });
+</script>
+{% endblock %}

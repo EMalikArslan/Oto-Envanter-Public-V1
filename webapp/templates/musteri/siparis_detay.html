@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Sipariş #{{ siparis.id }}{% endblock %}
+{% block page_title %}Sipariş #{{ siparis.id }}{% endblock %}
+{% block content %}
+{% set renk={'beklemede':'warning','onaylandi':'info','hazirlaniyor':'primary','kargolandi':'success','iptal':'danger'} %}
+<div class="row g-3">
+  <div class="col-md-4">
+    <div class="card">
+      <div class="card-body">
+        <p class="text-muted small mb-1">Sipariş Tarihi</p>
+        <p class="mb-3">{{ siparis.olusturma[:16] }}</p>
+        <p class="text-muted small mb-1">Durum</p>
+        <span class="badge bg-{{ renk.get(siparis.durum,'secondary') }} fs-6">{{ siparis.durum }}</span>
+        {% if siparis.notlar %}
+        <p class="text-muted small mt-3 mb-1">Notunuz</p>
+        <p>{{ siparis.notlar }}</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="col-md-8">
+    <div class="card">
+      <div class="table-responsive">
+        <table class="table mb-0">
+          <thead><tr><th>Ürün</th><th>Adet</th><th>Fiyat</th><th>İskonto</th><th>Toplam</th></tr></thead>
+          <tbody>
+            {% for k in kalemler %}
+            <tr>
+              <td><div class="fw-600">{{ k.marka }}</div><div class="text-muted small">{{ k.yaygin_ad }}</div></td>
+              <td>{{ k.adet }}</td>
+              <td>{{ '%.2f ₺'|format(k.birim_fiyat) }}</td>
+              <td>{% if k.iskonto_oran > 0 %}<span class="badge bg-success">%{{ k.iskonto_oran }}</span>{% else %}—{% endif %}</td>
+              <td class="fw-600">{{ '%.2f ₺'|format(k.toplam) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr><td colspan="4" class="text-end fw-700">TOPLAM</td>
+              <td class="fw-700 text-success">{{ '%.2f ₺'|format(siparis.toplam) }}</td></tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+    <a href="{{ url_for('musteri.siparislerim') }}" class="btn btn-outline-secondary mt-3">← Geri</a>
+  </div>
+</div>
+{% endblock %}

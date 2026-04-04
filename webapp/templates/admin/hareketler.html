@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Hareketler — ARES{% endblock %}
+{% block page_title %}Hareketler{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="table-responsive">
+    <table id="harTablo" class="table mb-0">
+      <thead><tr><th>Tarih</th><th>Tür</th><th>Kategori</th><th>Marka</th><th>Yaygın Ad</th><th>Adet</th><th>Tutar</th><th>Müşteri</th></tr></thead>
+      <tbody>
+        {% for h in rows %}
+        <tr>
+          <td class="text-muted small">{{ h.tarih[:16] if h.tarih else '—' }}</td>
+          <td><span class="badge bg-secondary">{{ h.tur or '—' }}</span></td>
+          <td class="text-muted small">{{ h.kategori }}</td>
+          <td>{{ h.marka }}</td>
+          <td>{{ h.yaygin_ad }}</td>
+          <td>{{ h.adet or 1 }}</td>
+          <td>{{ h.toplam_tutar or '—' }}</td>
+          <td class="text-muted small">{{ h.musteri or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+{% block extra_js %}<script>$('#harTablo').DataTable({order:[[0,'desc']})</script>{% endblock %}

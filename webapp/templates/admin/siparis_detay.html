@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Sipariş #{{ siparis.id }}{% endblock %}
+{% block page_title %}Sipariş #{{ siparis.id }}{% endblock %}
+{% block content %}
+<div class="row g-3">
+  <div class="col-md-4">
+    <div class="card">
+      <div class="card-header">Müşteri Bilgisi</div>
+      <div class="card-body">
+        <p class="mb-1"><strong>{{ siparis.ad_soyad }}</strong></p>
+        <p class="mb-1 text-muted small">{{ siparis.email }}</p>
+        <p class="mb-1 text-muted small">{{ siparis.telefon or '—' }}</p>
+        <hr class="border-secondary">
+        <p class="mb-1 text-muted small">Sipariş: {{ siparis.olusturma[:16] }}</p>
+        {% if siparis.notlar %}
+        <p class="mb-0 text-muted small">Not: {{ siparis.notlar }}</p>
+        {% endif %}
+      </div>
+    </div>
+    <div class="card mt-3">
+      <div class="card-header">Durum Güncelle</div>
+      <div class="card-body">
+        <form method="POST" action="{{ url_for('admin.siparis_durum', spid=siparis.id) }}">
+          <select name="durum" class="form-select mb-2">
+            {% for d in ['beklemede','onaylandi','hazirlaniyor','kargolandi','iptal'] %}
+            <option value="{{ d }}" {{ 'selected' if siparis.durum==d }}>{{ d }}</option>
+            {% endfor %}
+          </select>
+          <button type="submit" class="btn btn-ares w-100">Güncelle</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-8">
+    <div class="card">
+      <div class="card-header">Kalemler</div>
+      <div class="table-responsive">
+        <table class="table mb-0">
+          <thead><tr><th>Ürün</th><th>Adet</th><th>Birim Fiyat</th><th>İskonto</th><th>Toplam</th></tr></thead>
+          <tbody>
+            {% for k in kalemler %}
+            <tr>
+              <td>
+                <div class="fw-600">{{ k.marka }}</div>
+                <div class="text-muted small">{{ k.yaygin_ad }}</div>
+              </td>
+              <td>{{ k.adet }}</td>
+              <td>{{ '%.2f ₺'|format(k.birim_fiyat) }}</td>
+              <td>{% if k.iskonto_oran > 0 %}<span class="badge bg-success">%{{ k.iskonto_oran }}</span>{% else %}—{% endif %}</td>
+              <td class="fw-600">{{ '%.2f ₺'|format(k.toplam) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr class="table-active">
+              <td colspan="4" class="text-end fw-700">TOPLAM</td>
+              <td class="fw-700 text-success">{{ '%.2f ₺'|format(siparis.toplam) }}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+    <a href="{{ url_for('admin.siparisler') }}" class="btn btn-outline-secondary mt-3">← Geri</a>
+  </div>
+</div>
+{% endblock %}

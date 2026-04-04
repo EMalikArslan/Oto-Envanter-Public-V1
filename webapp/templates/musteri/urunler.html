@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Ürünler — ARES{% endblock %}
+{% block page_title %}Ürün Kataloğu{% endblock %}
+{% block content %}
+
+<!-- Filtreler -->
+<form method="GET" class="row g-2 mb-4">
+  <div class="col-md-6">
+    <input type="text" name="ara" class="form-control" placeholder="Marka, model, referans ara..."
+           value="{{ ara }}">
+  </div>
+  <div class="col-md-3">
+    <select name="kat" class="form-select">
+      <option value="">Tüm Kategoriler</option>
+      {% for k in kategoriler %}
+      <option value="{{ k.kategori }}" {{ 'selected' if kat==k.kategori }}>{{ k.kategori }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-md-3">
+    <button type="submit" class="btn btn-ares w-100">Filtrele</button>
+  </div>
+</form>
+
+<!-- Ürün kartları -->
+{% if rows %}
+<div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3">
+  {% for r in rows %}
+  <div class="col">
+    <div class="card h-100">
+      {% if r.kapak %}
+      <img src="{{ url_for('static', filename='img/urunler/' + r.kapak) }}"
+           style="height:160px;object-fit:cover;border-radius:10px 10px 0 0;">
+      {% else %}
+      <div style="height:120px;background:#2a2a2a;border-radius:10px 10px 0 0;
+                  display:flex;align-items:center;justify-content:center;color:#555;">
+        <i class="bi bi-image" style="font-size:2rem;"></i>
+      </div>
+      {% endif %}
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start mb-1">
+          <span class="badge bg-secondary">{{ r.kategori }}</span>
+          <span class="badge badge-depoda">{{ r.depoda }} adet</span>
+        </div>
+        <h6 class="fw-700 mb-1">{{ r.marka }}</h6>
+        <p class="text-muted small mb-2">{{ r.yaygin_ad }}</p>
+        {% if r.ref1 and r.ref1 != '-' %}
+        <p class="text-muted small mb-0">Ref: {{ r.ref1 }}</p>
+        {% endif %}
+
+        <div class="mt-2 d-flex align-items-center justify-content-between">
+          {% if r.fiyat and r.fiyat != '-' %}
+          <div>
+            {% if r.iskonto_oran > 0 %}
+            <del class="text-muted small">{{ r.fiyat }} ₺</del>
+            {% set net = (r.fiyat|float) * (1 - r.iskonto_oran/100) %}
+            <span class="fw-700 text-success ms-1">{{ '%.2f'|format(net) }} ₺</span>
+            <span class="badge bg-success ms-1">-%{{ r.iskonto_oran }}</span>
+            {% else %}
+            <span class="fw-700">{{ r.fiyat }} ₺</span>
+            {% endif %}
+          </div>
+          {% else %}
+          <span class="text-muted small">Fiyat için iletişime geçin</span>
+          {% endif %}
+        </div>
+      </div>
+      <div class="card-footer bg-transparent border-secondary d-flex gap-2">
+        <a href="{{ url_for('musteri.urun_detay', sid=r.id) }}"
+           class="btn btn-sm btn-outline-secondary flex-grow-1">Detay</a>
+        {% if r.depoda > 0 %}
+        <form method="POST" action="{{ url_for('musteri.sepete_ekle') }}">
+          <input type="hidden" name="stok_id" value="{{ r.id }}">
+          <input type="hidden" name="adet" value="1">
+          <button class="btn btn-sm btn-ares"><i class="bi bi-bag-plus"></i></button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-5 text-muted">
+  <i class="bi bi-search" style="font-size:3rem;"></i>
+  <p class="mt-2">Ürün bulunamadı.</p>
+</div>
+{% endif %}
+{% endblock %}

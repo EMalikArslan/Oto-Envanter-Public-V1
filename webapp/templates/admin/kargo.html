@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Kargo — ARES{% endblock %}
+{% block page_title %}Kargo{% endblock %}
+{% block content %}
+<div class="row g-3">
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header">Yeni Kargo Etiketi</div>
+      <div class="card-body">
+        <form method="POST" action="{{ url_for('admin.kargo_ekle') }}">
+          <div class="mb-2">
+            <label class="form-label">Müşteri (opsiyonel)</label>
+            <select name="musteri_id" class="form-select">
+              <option value="">— Seçin —</option>
+              {% for m in musteriler %}<option value="{{ m.id }}">{{ m.ad_soyad }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Alıcı Adı *</label>
+            <input type="text" name="alici_adi" class="form-control" required>
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Adres</label>
+            <textarea name="alici_adres" class="form-control" rows="2"></textarea>
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Telefon</label>
+            <input type="text" name="alici_telefon" class="form-control">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">İçerik</label>
+            <input type="text" name="icerik" class="form-control" placeholder="Ürün açıklaması">
+          </div>
+          <button type="submit" class="btn btn-ares w-100">
+            <i class="bi bi-printer me-1"></i>Etiket Oluştur
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header">Kargo Geçmişi</div>
+      <div class="table-responsive">
+        <table id="kargoTablo" class="table mb-0">
+          <thead><tr><th>#</th><th>Alıcı</th><th>Müşteri</th><th>Tarih</th><th>Durum</th><th></th></tr></thead>
+          <tbody>
+            {% for k in rows %}
+            <tr>
+              <td>K{{ '%06d'|format(k.id) }}</td>
+              <td>{{ k.alici_adi }}</td>
+              <td class="text-muted small">{{ k.musteri_adi or '—' }}</td>
+              <td class="text-muted small">{{ k.olusturma[:10] if k.olusturma else '—' }}</td>
+              <td><span class="badge bg-secondary">{{ k.durum or '—' }}</span></td>
+              <td><a href="{{ url_for('admin.etiket_indir', dosya='kargo_'+k.id|string+'.png') }}"
+                     class="btn btn-sm btn-outline-secondary" target="_blank">
+                <i class="bi bi-download"></i></a></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block extra_js %}<script>$('#kargoTablo').DataTable({order:[[3,'desc']})</script>{% endblock %}

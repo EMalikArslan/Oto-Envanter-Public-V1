@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Ürün Düzenle' if kayit else 'Yeni Ürün' }} — ARES{% endblock %}
+{% block page_title %}{{ 'Ürün Düzenle' if kayit else 'Yeni Ürün Ekle' }}{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+<div class="col-lg-8">
+
+<div class="card">
+  <div class="card-header">{{ 'Ürün Bilgileri — #' + kayit.id|string if kayit else 'Yeni Ürün' }}</div>
+  <div class="card-body">
+    <form method="POST" enctype="multipart/form-data">
+
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">Kategori *</label>
+          <select name="kategori" class="form-select" required>
+            {% for k in ["Beyin","ABS","Plastik"] %}
+            <option value="{{ k }}" {{ 'selected' if kayit and kayit.kategori==k }}>{{ k }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Marka *</label>
+          <input type="text" name="marka" class="form-control" required
+                 value="{{ kayit.marka if kayit else '' }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Yaygın Ad</label>
+          <input type="text" name="yaygin_ad" class="form-control"
+                 value="{{ kayit.yaygin_ad if kayit else '' }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Motor</label>
+          <input type="text" name="motor" class="form-control"
+                 value="{{ kayit.motor if kayit and kayit.motor != '-' else '' }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Fiyat (₺)</label>
+          <input type="text" name="fiyat" class="form-control"
+                 value="{{ kayit.fiyat if kayit and kayit.fiyat != '-' else '' }}">
+        </div>
+      </div>
+
+      <hr class="border-secondary my-3">
+      <p class="text-muted small mb-2">Referans Numaraları</p>
+      <div class="row g-2">
+        {% for i in range(1,6) %}
+        <div class="col-md-4 col-6">
+          <label class="form-label">Ref {{ i }}</label>
+          <input type="text" name="ref{{ i }}" class="form-control"
+                 value="{{ kayit['ref'+i|string] if kayit and kayit['ref'+i|string] not in ('-','') else '' }}">
+        </div>
+        {% endfor %}
+      </div>
+
+      {% if not kayit %}
+      <hr class="border-secondary my-3">
+      <div class="row g-2">
+        <div class="col-md-3">
+          <label class="form-label">Adet (fiziksel birim)</label>
+          <input type="number" name="adet" class="form-control" value="1" min="1" max="999">
+        </div>
+      </div>
+      {% else %}
+      <hr class="border-secondary my-3">
+      <p class="text-muted small mb-2">Stok Birimi Güncelle</p>
+      <div class="row g-2">
+        <div class="col-md-3">
+          <label class="form-label">Birim Ekle <span class="text-success">(+)</span></label>
+          <input type="number" name="birim_ekle" class="form-control" value="0" min="0">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Birim Çıkar <span class="text-danger">(−)</span></label>
+          <input type="number" name="birim_cikar" class="form-control" value="0" min="0">
+        </div>
+        <div class="col-12">
+          <p class="text-muted small mt-1 mb-0">
+            Mevcut birimler:
+            {% for b in birimler %}
+            <span class="badge
+              {% if b.durum=='DEPODA' %}badge-depoda
+              {% elif b.durum=='TURDA' %}badge-turda
+              {% else %}bg-secondary{% endif %} me-1">
+              {{ b.barkod_id }}
+            </span>
+            {% endfor %}
+          </p>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Görseller -->
+      <hr class="border-secondary my-3">
+      <p class="text-muted small mb-2">Ürün Görselleri</p>
+
+      {% if gorseller %}
+      <div class="d-flex flex-wrap gap-2 mb-2">
+        {% for g in gorseller %}
+        <div class="position-relative">
+          <img src="{{ url_for('static', filename='img/urunler/' + g.dosya) }}"
+               style="width:80px;height:80px;object-fit:cover;border-radius:8px;border:1px solid #333;">
+          <button type="button"
+                  onclick="gorselSil({{ g.id }}, this.closest('.position-relative'))"
+                  class="btn btn-sm btn-danger position-absolute"
+                  style="top:-6px;right:-6px;width:22px;height:22px;padding:0;font-size:.7rem;border-radius:50%;">
+            ×
+          </button>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <input type="file" name="gorseller" class="form-control" multiple accept="image/*">
+      <small class="text-muted">PNG, JPG, WEBP — maks. 8MB/dosya</small>
+
+      <hr class="border-secondary my-3">
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-ares px-4">
+          <i class="bi bi-check-lg me-1"></i>Kaydet
+        </button>
+        <a href="{{ url_for('admin.stok') }}" class="btn btn-outline-secondary">İptal</a>
+      </div>
+    </form>
+  </div>
+</div>
+</div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+function gorselSil(id, el) {
+  if(!confirm('Görseli sil?')) return;
+  fetch(`/admin/gorsel/${id}/sil`, {method:'POST'})
+    .then(r => r.json()).then(d => { if(d.ok) el.remove(); });
+}
+</script>
+{% endblock %}
