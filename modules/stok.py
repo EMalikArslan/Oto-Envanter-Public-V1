@@ -139,6 +139,21 @@ class StokYuklemeThread(QThread):
             self.bitti.emit(pd.DataFrame(),0,0,0,[])
 
 
+class SheetsThread(QThread):
+    """Google Sheets senkronizasyonunu arka planda yapar — UI donmaz."""
+    def __init__(self, satirlar):
+        super().__init__()
+        self._satirlar = satirlar
+    def run(self):
+        try:
+            from core.sheets import get_sheets
+            sheets = get_sheets()
+            if sheets.aktif:
+                sheets.stok_genel_yenile(self._satirlar)
+        except Exception:
+            pass
+
+
 class RefSecimDialog(QDialog):
     def __init__(self, refs, parent=None):
         super().__init__(parent)
@@ -675,19 +690,20 @@ class StokSayfasi(QWidget):
         return [list(r) for r in rows]
 
     def stok_sheets_gonder(self):
+        from core.sheets import get_sheets
         sheets = get_sheets()
         if not sheets.aktif:
-            QMessageBox.warning(self,"Sheets","Ayarlar'dan baglanti kurun."); return
+            QMessageBox.warning(self, "Sheets", "Ayarlar'dan baglanti kurun."); return
         rows = self._stok_satirlari()
-        sheets.stok_genel_yenile(rows)
-        QMessageBox.information(self,"Gonderildi",f"{len(rows)} urun Sheets'e eklendi.")
+        self._sheets_thread = SheetsThread(rows)
+        self._sheets_thread.start()
+        QMessageBox.information(self, "Gonderiliyor", f"{len(rows)} urun arka planda Sheets'e gonderiliyor.")
 
     def _silent_sheets_sync(self):
-        """Kullanıcıya bildirim göstermeden arka planda Sheets'e sync eder."""
-        sheets = get_sheets()
-        if not sheets.aktif: return
+        """Kullanıcıya bildirim göstermeden arka planda Sheets'e sync eder — UI donmaz."""
         rows = self._stok_satirlari()
-        sheets.stok_genel_yenile(rows)
+        self._sheets_thread = SheetsThread(rows)
+        self._sheets_thread.start()
 
     def _birim_goster(self):
         sid = self._get_secili_stok_id()
