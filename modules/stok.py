@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
     QPushButton, QLineEdit, QComboBox, QLabel, QFileDialog, QMessageBox,
     QDialog, QCheckBox, QFrame, QHeaderView, QAbstractItemView,
-    QSpinBox, QProgressDialog
+    QSpinBox, QProgressDialog, QTabWidget, QScrollArea
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt6.QtGui import QColor, QFont
@@ -388,7 +388,7 @@ class StokDialog(QDialog):
 
         birim_w = QWidget()
         birim_w.setLayout(birim_lay)
-        from PyQt6.QtWidgets import QScrollArea
+
         scroll = QScrollArea()
         scroll.setWidget(birim_w)
         scroll.setWidgetResizable(True)
