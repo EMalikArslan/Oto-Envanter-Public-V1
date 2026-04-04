@@ -62,12 +62,13 @@ def kargo_etiketi_olustur(kargo_id, alici_adi, alici_adres, alici_telefon, iceri
             except: pass
         return ImageFont.load_default()
 
-    f_firma  = f(fp_k, 22)
-    f_baslik = f(fp_k, 20)
-    f_alici  = f(fp_k, 28)
-    f_orta   = f(fp_n, 18)
-    f_kucuk  = f(fp_n, 15)
-    f_mini   = f(fp_n, 13)
+    f_firma      = f(fp_k, 22)
+    f_baslik     = f(fp_k, 20)
+    f_alici      = f(fp_k, 28)
+    f_gon_isim   = f(fp_k, 18)   # Gönderici isim — kalın + büyük
+    f_gon_detay  = f(fp_n, 16)   # Gönderici detay
+    f_kucuk      = f(fp_n, 15)
+    f_mini       = f(fp_n, 13)
 
     SH   = 42   # header yüksekliği
     ORTA = W // 2
@@ -98,13 +99,13 @@ def kargo_etiketi_olustur(kargo_id, alici_adi, alici_adres, alici_telefon, iceri
 
     # ── SOL — GÖNDERİCİ ──────────────────────────────────────────────────
     y = SH + 8
-    draw.text((PAD, y), "GONDERICI", fill="#888888", font=f_mini); y += 16
-    draw.text((PAD, y), _tr_k(GONDERICI["isim"]), fill="black", font=f_kucuk); y += 19
-    draw.text((PAD, y), f"Anl: {GONDERICI['anlasma_kodu']}", fill="#555555", font=f_mini); y += 16
+    draw.text((PAD, y), "GONDERICI", fill="#888888", font=f_kucuk); y += 20
+    draw.text((PAD, y), _tr_k(GONDERICI["isim"]), fill="black", font=f_gon_isim); y += 24
+    draw.text((PAD, y), f"Anl: {GONDERICI['anlasma_kodu']}", fill="#555555", font=f_gon_detay); y += 20
 
     if icerik and icerik != "-":
-        draw.text((PAD, y), "ICERIK:", fill="#888888", font=f_mini); y += 14
-        draw.text((PAD, y), _tr_k(str(icerik))[:22], fill="black", font=f_mini)
+        draw.text((PAD, y), "ICERIK:", fill="#888888", font=f_kucuk); y += 18
+        draw.text((PAD, y), _tr_k(str(icerik))[:22], fill="black", font=f_gon_detay)
 
     # Kargo no + tarih (sol alt)
     draw.text((PAD, H-PAD-24), f"K{kargo_id:06d}", fill="#555555", font=f_kucuk)
@@ -187,6 +188,13 @@ class YeniKargoSayfasi(QWidget):
         form.setSpacing(10)
         form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
 
+        # Kayıtlı müşteri seçimi
+        self.musteri_cb = QComboBox()
+        self.musteri_cb.setMinimumHeight(34)
+        self.musteri_cb.addItem("— Manuel Giriş —", None)
+        self.musteri_cb.currentIndexChanged.connect(self._musteri_sec)
+        form.addRow("Kayıtlı Müşteri", self.musteri_cb)
+
         self.alici_adi     = QLineEdit(); self.alici_adi.setPlaceholderText("Alıcı adı soyadı")
         self.alici_adres   = QLineEdit(); self.alici_adres.setPlaceholderText("Adres")
         self.alici_telefon = QLineEdit(); self.alici_telefon.setPlaceholderText("05XX XXX XXXX")
@@ -197,6 +205,8 @@ class YeniKargoSayfasi(QWidget):
         form.addRow("Telefon",      self.alici_telefon)
         form.addRow("İçerik",       self.icerik)
         lay.addLayout(form)
+
+        self._musteri_yukle()
 
         self.btn = QPushButton("📦  Etiket Oluştur")
         self.btn.setFixedHeight(40)
@@ -212,7 +222,47 @@ class YeniKargoSayfasi(QWidget):
         lay.addWidget(self.durum_lbl)
         lay.addStretch()
 
-    def guncelle(self): pass
+    def guncelle(self):
+        self._musteri_yukle()
+
+    def _musteri_yukle(self):
+        """DB'den müşterileri çekip combo'ya doldur."""
+        try:
+            with get_conn() as conn:
+                rows = conn.execute(
+                    "SELECT id, ad_soyad, telefon, adres FROM musteri ORDER BY ad_soyad"
+                ).fetchall()
+        except Exception:
+            rows = []
+        self.musteri_cb.blockSignals(True)
+        # Mevcut seçimi koru
+        secili = self.musteri_cb.currentData()
+        self.musteri_cb.clear()
+        self.musteri_cb.addItem("— Manuel Giriş —", None)
+        for r in rows:
+            self.musteri_cb.addItem(f"{r[1]}  ({r[2] or '—'})", r[0])
+        # Kaydedilen seçimi geri yükle
+        if secili:
+            for i in range(self.musteri_cb.count()):
+                if self.musteri_cb.itemData(i) == secili:
+                    self.musteri_cb.setCurrentIndex(i); break
+        self.musteri_cb.blockSignals(False)
+
+    def _musteri_sec(self, idx):
+        mid = self.musteri_cb.currentData()
+        if not mid:
+            return
+        try:
+            with get_conn() as conn:
+                row = conn.execute(
+                    "SELECT ad_soyad, adres, telefon FROM musteri WHERE id=?", (mid,)
+                ).fetchone()
+            if row:
+                self.alici_adi.setText(row[0] or "")
+                self.alici_adres.setText(row[1] or "")
+                self.alici_telefon.setText(row[2] or "")
+        except Exception:
+            pass
 
     def _olustur(self):
         adi = self.alici_adi.text().strip()

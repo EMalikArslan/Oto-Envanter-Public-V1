@@ -636,20 +636,20 @@ class KuralYoneticisiSayfasi(QWidget):
     def _kural_ekle(self):
         dlg = KuralDialog(self)
         if dlg.exec() != QDialog.DialogCode.Accepted: return
-        d = dlg.get_veri()
+        kayitlar = dlg.get_veri()   # Liste döner
         conn = get_conn()
-        # Aynı kombinasyon varsa güncelle
-        mevcut = conn.execute(
-            "SELECT id FROM eksik_kural WHERE kategori=? AND marka=?",
-            (d["kategori"], d["marka"])).fetchone()
-        if mevcut:
-            conn.execute(
-                "UPDATE eksik_kural SET min_adet=?, aktif=1 WHERE id=?",
-                (d["min_adet"], mevcut["id"]))
-        else:
-            conn.execute(
-                "INSERT INTO eksik_kural (kategori,marka,min_adet) VALUES (?,?,?)",
-                (d["kategori"], d["marka"], d["min_adet"]))
+        for d in kayitlar:
+            mevcut = conn.execute(
+                "SELECT id FROM eksik_kural WHERE kategori=? AND marka=?",
+                (d["kategori"], d["marka"])).fetchone()
+            if mevcut:
+                conn.execute(
+                    "UPDATE eksik_kural SET min_adet=?, aktif=1 WHERE id=?",
+                    (d["min_adet"], mevcut[0]))
+            else:
+                conn.execute(
+                    "INSERT INTO eksik_kural (kategori,marka,min_adet) VALUES (?,?,?)",
+                    (d["kategori"], d["marka"], d["min_adet"]))
         conn.commit(); conn.close()
         self.yukle()
 
@@ -659,11 +659,17 @@ class KuralYoneticisiSayfasi(QWidget):
         r = self._rows[rows[0].row()]
         dlg = KuralDialog(self, mevcut=r)
         if dlg.exec() != QDialog.DialogCode.Accepted: return
-        d = dlg.get_veri()
+        kayitlar = dlg.get_veri()   # Liste döner
         conn = get_conn()
-        conn.execute(
-            "UPDATE eksik_kural SET kategori=?, marka=?, min_adet=? WHERE id=?",
-            (d["kategori"], d["marka"], d["min_adet"], r["id"]))
+        for i, d in enumerate(kayitlar):
+            if i == 0:
+                conn.execute(
+                    "UPDATE eksik_kural SET kategori=?, marka=?, min_adet=? WHERE id=?",
+                    (d["kategori"], d["marka"], d["min_adet"], r["id"]))
+            else:
+                conn.execute(
+                    "INSERT INTO eksik_kural (kategori,marka,min_adet) VALUES (?,?,?)",
+                    (d["kategori"], d["marka"], d["min_adet"]))
         conn.commit(); conn.close()
         self.yukle()
 
