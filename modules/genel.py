@@ -488,8 +488,16 @@ class KuralDialog(QDialog):
         self.chk_tum=QCheckBox("Tum urunler (bu marka+grup icin)")
         self.chk_tum.setChecked(True)
         self.chk_tum.setStyleSheet(f"font-size:13px;font-weight:600;color:{RENK['metin']};")
-        self.chk_tum.stateChanged.connect(lambda s: self.lst_urun.setEnabled(not bool(s)))
+        self.chk_tum.stateChanged.connect(self._tum_degisti)
         lay.addWidget(self.chk_tum)
+
+        # Ürün arama kutusu
+        self.ara_urun = QLineEdit()
+        self.ara_urun.setPlaceholderText("Ürün ara...")
+        self.ara_urun.setMinimumHeight(32)
+        self.ara_urun.setEnabled(False)
+        self.ara_urun.textChanged.connect(self._urun_filtrele)
+        lay.addWidget(self.ara_urun)
 
         self.lst_urun=QListWidget(); self.lst_urun.setMinimumHeight(150); self.lst_urun.setEnabled(False)
         self.lst_urun.setSelectionMode(QAbstractItemView.SelectionMode.MultiSelection)
@@ -522,6 +530,17 @@ class KuralDialog(QDialog):
         bk=QPushButton("Kaydet"); bk.setObjectName("BtnAksan"); bk.clicked.connect(self._kaydet)
         btn_lay.addWidget(bi); btn_lay.addWidget(bk); lay.addLayout(btn_lay)
 
+    def _tum_degisti(self, state):
+        aktif = not bool(state)
+        self.lst_urun.setEnabled(aktif)
+        self.ara_urun.setEnabled(aktif)
+
+    def _urun_filtrele(self, metin):
+        metin = metin.lower()
+        for i in range(self.lst_urun.count()):
+            item = self.lst_urun.item(i)
+            item.setHidden(metin not in item.text().lower())
+
     def _kat_degisti(self):
         kat=self.cb_kat.currentText()
         conn=get_conn()
@@ -533,11 +552,12 @@ class KuralDialog(QDialog):
 
     def _marka_degisti(self):
         kat=self.cb_kat.currentText(); marka=self.cb_marka.currentText()
+        if not marka: return
         conn=get_conn()
         rows=conn.execute("""SELECT s.id,s.yaygin_ad,COALESCE(d.n,0) dep
                FROM stok s LEFT JOIN (SELECT stok_id,COUNT(*) n FROM stok_birimi WHERE durum='DEPODA' GROUP BY stok_id) d ON d.stok_id=s.id
                WHERE s.kategori=? AND s.marka=? ORDER BY s.yaygin_ad""",(kat,marka)).fetchall()
-        conn.close(); self.lst_urun.clear()
+        conn.close(); self.lst_urun.clear(); self.ara_urun.clear()
         for r in rows:
             item=QListWidgetItem(f"{r['yaygin_ad']}  ({r['dep']} depoda)  [ID:{r['id']}]")
             item.setData(Qt.ItemDataRole.UserRole,r["id"]); self.lst_urun.addItem(item)
