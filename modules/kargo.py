@@ -341,10 +341,11 @@ class YeniKargoSayfasi(QWidget):
             return
         try:
             conn = get_conn()
+            mid = self.musteri_cb.currentData()  # None if "Manuel Giriş"
             cur = conn.execute(
-                "INSERT INTO kargo (alici_adi, alici_adres, alici_telefon, icerik, durum) "
-                "VALUES (?,?,?,?,'hazirlaniyor')",
-                (adi, self.alici_adres.text().strip(),
+                "INSERT INTO kargo (musteri_id, alici_adi, alici_adres, alici_telefon, icerik, durum) "
+                "VALUES (?,?,?,?,?,'HAZIRLANIYOR')",
+                (mid, adi, self.alici_adres.text().strip(),
                  self.alici_telefon.text().strip(), self.icerik.text().strip())
             )
             kid = cur.lastrowid

@@ -427,7 +427,7 @@ class MusteriListesiSayfasi(QWidget):
             dukkan_adi=:dukkan_adi, yetkili_adi=:yetkili_adi,
             il=:il, ilce=:ilce, adres=:adres, telefon=:telefon,
             email=:email, urun_gruplari=:urun_gruplari, notlar=:notlar
-            WHERE id=""" + str(mid), d)
+            WHERE id=:id""", {**d, "id": mid})
         conn.commit(); conn.close()
         self.yukle()
 
