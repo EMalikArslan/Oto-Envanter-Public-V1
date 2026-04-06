@@ -463,7 +463,13 @@ class KuralDialog(QDialog):
     def __init__(self, parent=None, mevcut=None):
         super().__init__(parent)
         self.setWindowTitle("Eksik Kuralı"); self.setMinimumSize(460,520)
-        self.setStyleSheet(f"background-color:{RENK['yuzey']}; color:{RENK['metin']};")
+        self.setStyleSheet(
+            f"QDialog {{ background:{RENK['yuzey']}; color:{RENK['metin']}; }}"
+            f"QPushButton#BtnAksan {{ background:{RENK['aksan']}; color:#FFFFFF; border-radius:6px; padding:6px 18px; font-weight:600; }}"
+            f"QPushButton#BtnAksan:hover {{ background:{RENK['aksan2']}; }}"
+            f"QPushButton#BtnIkincil {{ background:transparent; color:{RENK['metin']}; border:1.5px solid {RENK['cizgi_koyu']}; border-radius:6px; padding:6px 18px; }}"
+            f"QPushButton#BtnIkincil:hover {{ border-color:{RENK['metin']}; background:{RENK['yuzey2']}; }}"
+        )
         lay = QVBoxLayout(self); lay.setSpacing(10); lay.setContentsMargins(24,20,24,20)
         lbl=QLabel("Eksik Kuralı Tanımla"); lbl.setStyleSheet("font-size:16px;font-weight:700;")
         lay.addWidget(lbl); lay.addWidget(AyiriciCizgi())

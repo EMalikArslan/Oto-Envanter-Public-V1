@@ -202,7 +202,13 @@ class RefSecimDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Etiket — Referans Seçimi")
         self.setMinimumWidth(320)
-        self.setStyleSheet(f"background:{RENK['yuzey']}; color:{RENK['metin']};")
+        self.setStyleSheet(
+            f"QDialog {{ background:{RENK['yuzey']}; color:{RENK['metin']}; }}"
+            f"QPushButton#BtnAksan {{ background:{RENK['aksan']}; color:#FFFFFF; border-radius:6px; padding:6px 18px; font-weight:600; }}"
+            f"QPushButton#BtnAksan:hover {{ background:{RENK['aksan2']}; }}"
+            f"QPushButton#BtnIkincil {{ background:transparent; color:{RENK['metin']}; border:1.5px solid {RENK['cizgi_koyu']}; border-radius:6px; padding:6px 18px; }}"
+            f"QPushButton#BtnIkincil:hover {{ border-color:{RENK['metin']}; background:{RENK['yuzey2']}; }}"
+        )
         lay = QVBoxLayout(self)
         lay.setSpacing(10); lay.setContentsMargins(20,20,20,20)
         lay.addWidget(QLabel("Etikete basılacak referansları seçin:"))
@@ -228,7 +234,13 @@ class BirimDialog(QDialog):
         self.stok_id = stok_id
         self.setWindowTitle(f"Birimler — {marka} / {ad}")
         self.setMinimumSize(500, 400)
-        self.setStyleSheet(f"background:{RENK['yuzey']}; color:{RENK['metin']};")
+        self.setStyleSheet(
+            f"QDialog {{ background:{RENK['yuzey']}; color:{RENK['metin']}; }}"
+            f"QPushButton#BtnAksan {{ background:{RENK['aksan']}; color:#FFFFFF; border-radius:6px; padding:6px 18px; font-weight:600; }}"
+            f"QPushButton#BtnAksan:hover {{ background:{RENK['aksan2']}; }}"
+            f"QPushButton#BtnIkincil {{ background:transparent; color:{RENK['metin']}; border:1.5px solid {RENK['cizgi_koyu']}; border-radius:6px; padding:6px 18px; }}"
+            f"QPushButton#BtnIkincil:hover {{ border-color:{RENK['metin']}; background:{RENK['yuzey2']}; }}"
+        )
         lay = QVBoxLayout(self)
         lay.setContentsMargins(20,20,20,20); lay.setSpacing(12)
 
@@ -321,7 +333,13 @@ class StokDialog(QDialog):
         self.setWindowTitle("Ürün Düzenle" if kayit else "Yeni Ürün Ekle")
         self.setMinimumWidth(520)
         self.setMinimumHeight(500)
-        self.setStyleSheet(f"background:{RENK['yuzey']}; color:{RENK['metin']};")
+        self.setStyleSheet(
+            f"QDialog {{ background:{RENK['yuzey']}; color:{RENK['metin']}; }}"
+            f"QPushButton#BtnAksan {{ background:{RENK['aksan']}; color:#FFFFFF; border-radius:6px; padding:6px 18px; font-weight:600; }}"
+            f"QPushButton#BtnAksan:hover {{ background:{RENK['aksan2']}; }}"
+            f"QPushButton#BtnIkincil {{ background:transparent; color:{RENK['metin']}; border:1.5px solid {RENK['cizgi_koyu']}; border-radius:6px; padding:6px 18px; }}"
+            f"QPushButton#BtnIkincil:hover {{ border-color:{RENK['metin']}; background:{RENK['yuzey2']}; }}"
+        )
 
         ana = QVBoxLayout(self)
         ana.setSpacing(10); ana.setContentsMargins(16, 16, 16, 16)
