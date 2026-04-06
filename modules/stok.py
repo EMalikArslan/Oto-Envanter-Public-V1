@@ -89,7 +89,8 @@ class EtiketThread(QThread):
     bitti    = pyqtSignal(str, str)   # (barkod_id, dosya_yolu)
     hata     = pyqtSignal(str, str)   # (barkod_id, hata_mesaji)
 
-    def __init__(self, barkod_id, stok_id, kategori, marka, ad, secili_refler):
+    def __init__(self, barkod_id, stok_id, kategori, marka, ad, secili_refler,
+                 birim_db_id=None):
         super().__init__()
         self.barkod_id     = barkod_id
         self.stok_id       = stok_id
@@ -97,12 +98,33 @@ class EtiketThread(QThread):
         self.marka         = marka
         self.ad            = ad
         self.secili_refler = secili_refler
+        self.birim_db_id   = birim_db_id  # varsa DB güncelle + yazıcıya gönder
 
     def run(self):
         try:
             yol = etiket_olustur(self.barkod_id, self.stok_id,
                                   self.kategori, self.marka,
                                   self.ad, self.secili_refler)
+            # DB güncelleme + yazıcı gönderimi main thread'i bloklamamak için burada yapılır
+            if self.birim_db_id is not None:
+                try:
+                    c = get_conn()
+                    c.execute("UPDATE stok_birimi SET etiket_basildi='EVET' WHERE id=?",
+                              (self.birim_db_id,))
+                    c.commit(); c.close()
+                except Exception:
+                    pass
+                try:
+                    yazicilar = yazici_listesi()
+                    ok, _ = yazici_gonder(yol, yazicilar[0] if yazicilar else None)
+                    if not ok:
+                        import subprocess as sp, sys as _sys
+                        if _sys.platform == "win32":
+                            os.startfile(os.path.dirname(yol))
+                        else:
+                            sp.Popen(["xdg-open", os.path.dirname(yol)])
+                except Exception:
+                    pass
             self.bitti.emit(self.barkod_id, yol)
         except Exception as e:
             self.hata.emit(self.barkod_id, str(e))
@@ -253,24 +275,21 @@ class BirimDialog(QDialog):
         refs = [r for r in refs if r and r != "-"]
         dlg = RefSecimDialog(refs, self)
         if dlg.exec() != QDialog.DialogCode.Accepted: return
-        try:
-            yol = etiket_olustur(barkod_id, stok["id"],
-                                  stok["kategori"], stok["marka"],
-                                  stok["yaygin_ad"], dlg.get_secili())
-            conn = get_conn()
-            conn.execute("UPDATE stok_birimi SET etiket_basildi='EVET' WHERE barkod_id=?",
-                         (barkod_id,))
-            conn.commit(); conn.close()
-            yazicilar = yazici_listesi()
-            ok, _ = yazici_gonder(yol, yazicilar[0] if yazicilar else None)
-            if not ok:
-                import subprocess as sp, sys
-                if sys.platform == "win32": os.startfile(os.path.dirname(yol))
-                else: sp.Popen(["xdg-open", os.path.dirname(yol)])
+        # EtiketThread ile çalıştır — DB update + yazıcı gönderimi thread içinde
+        birim_id = stok["birim_id"]
+        t = EtiketThread(barkod_id, stok["id"], stok["kategori"],
+                         stok["marka"], stok["yaygin_ad"],
+                         dlg.get_secili(), birim_db_id=birim_id)
+        def _bitti(bid, yol, thr=t):
             self.yukle()
-            QMessageBox.information(self, "OK", f"✓ Etiket: {barkod_id}")
-        except Exception as e:
-            QMessageBox.critical(self, "Hata", str(e))
+            QMessageBox.information(self, "OK", f"✓ Etiket: {bid}")
+            thr.deleteLater()
+        def _hata(bid, msg, thr=t):
+            QMessageBox.critical(self, "Hata", msg)
+            thr.deleteLater()
+        t.bitti.connect(_bitti)
+        t.hata.connect(_hata)
+        t.start()
 
 
 # ── Stok Ekle / Düzenle Dialog ────────────────────────────────────────────
@@ -817,16 +836,9 @@ class StokSayfasi(QWidget):
         self._etiket_bitti_cnt = 0
         self._etiket_progress  = progress
 
-        def _birim_bitti(barkod_id, yol, birim_db_id):
-            c = get_conn()
-            c.execute("UPDATE stok_birimi SET etiket_basildi='EVET' WHERE id=?", (birim_db_id,))
-            c.commit(); c.close()
-            yazicilar = yazici_listesi()
-            ok, _ = yazici_gonder(yol, yazicilar[0] if yazicilar else None)
-            if not ok:
-                import subprocess as sp, sys as _sys
-                if _sys.platform == "win32": os.startfile(os.path.dirname(yol))
-                else: sp.Popen(["xdg-open", os.path.dirname(yol)])
+        def _birim_bitti(barkod_id, yol):
+            # DB güncelleme + yazıcı gönderimi EtiketThread.run() içinde yapıldı
+            # Bu callback sadece UI günceller — main thread'i bloklamaz
             self._etiket_basarili  += 1
             self._etiket_bitti_cnt += 1
             progress.setValue(self._etiket_bitti_cnt)
@@ -844,23 +856,22 @@ class StokSayfasi(QWidget):
             if self._etiket_bitti_cnt >= self._etiket_toplam:
                 self.yukle()
 
-        # Her birimi kendi thread'inde oluştur (sıralı: bir sonraki bir önceki bitince)
-        # Basit yaklaşım: her birimi arka plan thread'inde sırayla işle
-        self._etiket_kuyruk = list(gorevler)
+        self._etiket_kuyruk    = list(gorevler)
         self._etiket_bitti_cb  = _birim_bitti
         self._etiket_hata_cb   = _birim_hata
         self._etiket_progress  = progress
         self._etiket_ileri()
 
     def _etiket_ileri(self):
-        """Kuyruktaki bir sonraki birimi thread'de işler."""
+        """Kuyruktaki bir sonraki birimi thread'de işler (DB + yazıcı dahil)."""
         if not self._etiket_kuyruk: return
         barkod_id, sid, kat, marka, ad, secili, birim_db_id = self._etiket_kuyruk.pop(0)
-        t = EtiketThread(barkod_id, sid, kat, marka, ad, secili)
-        def _bitti(bid, yol, dbid=birim_db_id, thread=t):
-            self._etiket_bitti_cb(bid, yol, dbid)
+        # birim_db_id thread'e verilir → DB update + yazıcı gönderimi thread içinde yapılır
+        t = EtiketThread(barkod_id, sid, kat, marka, ad, secili, birim_db_id)
+        def _bitti(bid, yol, thread=t):
+            self._etiket_bitti_cb(bid, yol)
             self._etiket_ileri()
-            thread.deleteLater()  # Thread bittikten sonra belleği serbest bırak
+            thread.deleteLater()
             if thread in self._etiket_threads:
                 self._etiket_threads.remove(thread)
         def _hata(bid, msg, thread=t):
