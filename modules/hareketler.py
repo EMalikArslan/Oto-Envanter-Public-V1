@@ -397,25 +397,33 @@ class HizliSatisSayfasi(QWidget):
     def _liste_filtrele(self):
         if self._df.empty:
             self.liste_tablo.setRowCount(0); return
-        d = self._df.copy()
+        mask = pd.Series([True] * len(self._df), index=self._df.index)
         kat = self.cb_kat.currentText()
         ara = self.ara_txt.text().strip().lower()
         if kat != "Tüm Kategoriler":
-            d = d[d["kategori"] == kat]
+            mask &= self._df["kategori"] == kat
         if ara:
-            mask = d.astype(str).apply(
-                lambda c: c.str.lower().str.contains(ara, na=False)).any(axis=1)
-            d = d[mask]
-        self.liste_tablo.setRowCount(len(d))
-        for i, (_, r) in enumerate(d.iterrows()):
-            for j, val in enumerate([str(r["id"]), r["kategori"],
-                                      r["marka"], r["yaygin_ad"],
-                                      str(r["stok_miktari"])]):
-                item = QTableWidgetItem(val)
-                item.setTextAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
-                if r["stok_miktari"] <= 0:
-                    item.setForeground(QColor(RENK["metin3"]))
-                self.liste_tablo.setItem(i, j, item)
+            arama_str = (self._df["marka"].fillna("").str.lower() + " " +
+                         self._df["yaygin_ad"].fillna("").str.lower() + " " +
+                         self._df["kategori"].fillna("").str.lower())
+            mask &= arama_str.str.contains(ara, regex=False, na=False)
+        d = self._df[mask]
+        _align = Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft
+        _c_bos = QColor(RENK["metin3"])
+        self.liste_tablo.setUpdatesEnabled(False)
+        try:
+            self.liste_tablo.setRowCount(len(d))
+            for i, (_, r) in enumerate(d.iterrows()):
+                bos = r["stok_miktari"] <= 0
+                for j, val in enumerate([str(r["id"]), r["kategori"],
+                                          r["marka"], r["yaygin_ad"],
+                                          str(r["stok_miktari"])]):
+                    item = QTableWidgetItem(val)
+                    item.setTextAlignment(_align)
+                    if bos: item.setForeground(_c_bos)
+                    self.liste_tablo.setItem(i, j, item)
+        finally:
+            self.liste_tablo.setUpdatesEnabled(True)
 
     def _listeden_ekle(self):
         rows = self.liste_tablo.selectionModel().selectedRows()
@@ -927,33 +935,38 @@ class HareketGecmisiSayfasi(QWidget):
 
         tip_renk = {"SATIS": RENK["aksan"], "MAL_GIRIS": RENK["yesil"], "DUZELTME": RENK["mavi"]}
         tip_lbl  = {"SATIS": "SATIŞ", "MAL_GIRIS": "GİRİŞ", "DUZELTME": "DÜZELTME"}
+        _align   = Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft
+        _bold    = QFont("", -1, QFont.Weight.Bold)
 
-        self.tablo.setRowCount(len(rows))
-        for i, r in enumerate(rows):
-            musteri_ted = r["musteri_adi"] or r["tedarikci"] or "-"
-            tutar_str = (f"₺{r['toplam_tutar']:,.2f}"
-                        if r["toplam_tutar"] else f"₺{r['giris_fiyati']:,.2f}")
-
-            vals = [
-                str(r["zaman"] or "")[:16],
-                tip_lbl.get(r["hareket_tipi"], r["hareket_tipi"]),
-                str(r["stok_id"] or ""),
-                r["kategori"] or "-",
-                r["marka"] or "-",
-                r["yaygin_ad"] or "-",
-                str(r["adet"]),
-                f"₺{r['birim_fiyat']:,.2f}" if r["birim_fiyat"] else "-",
-                tutar_str,
-                musteri_ted,
-            ]
-            renk = tip_renk.get(r["hareket_tipi"], RENK["metin"])
-            for j, val in enumerate(vals):
-                item = QTableWidgetItem(val)
-                item.setTextAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
-                if j == 1:
-                    item.setForeground(QColor(renk))
-                    item.setFont(QFont("", -1, QFont.Weight.Bold))
-                self.tablo.setItem(i, j, item)
+        self.tablo.setUpdatesEnabled(False)
+        try:
+            self.tablo.setRowCount(len(rows))
+            for i, r in enumerate(rows):
+                musteri_ted = r["musteri_adi"] or r["tedarikci"] or "-"
+                tutar_str = (f"₺{r['toplam_tutar']:,.2f}"
+                            if r["toplam_tutar"] else f"₺{r['giris_fiyati']:,.2f}")
+                vals = [
+                    str(r["zaman"] or "")[:16],
+                    tip_lbl.get(r["hareket_tipi"], r["hareket_tipi"]),
+                    str(r["stok_id"] or ""),
+                    r["kategori"] or "-",
+                    r["marka"] or "-",
+                    r["yaygin_ad"] or "-",
+                    str(r["adet"]),
+                    f"₺{r['birim_fiyat']:,.2f}" if r["birim_fiyat"] else "-",
+                    tutar_str,
+                    musteri_ted,
+                ]
+                renk = QColor(tip_renk.get(r["hareket_tipi"], RENK["metin"]))
+                for j, val in enumerate(vals):
+                    item = QTableWidgetItem(val)
+                    item.setTextAlignment(_align)
+                    if j == 1:
+                        item.setForeground(renk)
+                        item.setFont(_bold)
+                    self.tablo.setItem(i, j, item)
+        finally:
+            self.tablo.setUpdatesEnabled(True)
 
         self.lbl_sayac.setText(f"{len(rows)} kayıt")
 

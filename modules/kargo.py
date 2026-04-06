@@ -68,8 +68,9 @@ def kargo_etiketi_olustur(kargo_id, alici_adi, alici_adres, alici_telefon, iceri
     f_firma     = f(fp_k, 22)
     f_alici     = f(fp_k, 28)
     f_gon_isim  = f(fp_k, 18)
-    f_gon_detay = f(fp_n, 16)
+    f_gon_detay = f(fp_n, 20)   # anlaşma no / içerik (+4 punto)
     f_kucuk     = f(fp_n, 15)
+    f_adres     = f(fp_n, 19)   # alıcı adresi (+4 punto)
     f_mini      = f(fp_n, 13)
 
     SH   = 42
@@ -124,7 +125,7 @@ def kargo_etiketi_olustur(kargo_id, alici_adi, alici_adres, alici_telefon, iceri
             satir = [kelime]
     if satir: satirlar.append(" ".join(satir))
     for s in satirlar[:3]:
-        draw.text((sx, y), s, fill="black", font=f_kucuk); y += 19
+        draw.text((sx, y), s, fill="black", font=f_adres); y += 22
 
     if alici_telefon and alici_telefon != "-":
         y += 4
@@ -163,15 +164,16 @@ class KargoThread(QThread):
 # ── Yeni Kargo Formu ──────────────────────────────────────────────────────────
 class YeniKargoSayfasi(QWidget):
 
-    ALAN_STIL = (
-        f"QLineEdit, QComboBox {{"
-        f"  background:#2a2a2a; border:1px solid #3a3a3a;"
-        f"  border-radius:6px; color:#ddd; padding:6px 10px; font-size:13px;"
+    _FORM_STIL = (
+        f"QFrame#FormKart QLineEdit, QFrame#FormKart QComboBox {{"
+        f"  background:{RENK['yuzey2']}; border:1px solid {RENK['cizgi_koyu']};"
+        f"  border-radius:6px; color:{RENK['metin']}; padding:6px 10px; font-size:13px;"
         f"}}"
-        f"QLineEdit:focus, QComboBox:focus {{"
-        f"  border-color:#C0392B;"
+        f"QFrame#FormKart QLineEdit:focus, QFrame#FormKart QComboBox:focus {{"
+        f"  border-color:{RENK['aksan']};"
         f"}}"
-        f"QLabel {{ color:#aaa; font-size:12px; font-weight:600; }}"
+        f"QFrame#FormKart QLabel {{ color:{RENK['metin2']}; font-size:11px; "
+        f"  font-weight:700; letter-spacing:0.5px; }}"
     )
 
     def __init__(self):
@@ -180,64 +182,78 @@ class YeniKargoSayfasi(QWidget):
         self._build()
 
     def _build(self):
-        self.setStyleSheet(f"background:{RENK['zemin']}; color:{RENK['metin']};")
+        self.setStyleSheet(
+            f"YeniKargoSayfasi {{ background:{RENK['zemin']}; }}"
+            f"QLabel {{ color:{RENK['metin']}; }}"
+            + self._FORM_STIL
+        )
         ana = QHBoxLayout(self)
         ana.setContentsMargins(20, 16, 20, 16)
         ana.setSpacing(20)
 
         # ── SOL: Form ────────────────────────────────────────────────────
         sol = QVBoxLayout()
-        sol.setSpacing(12)
+        sol.setSpacing(10)
 
         baslik = QLabel("📦  Kargo Etiketi Oluştur")
-        baslik.setStyleSheet("font-size:16px;font-weight:700;color:#fff; padding-bottom:4px;")
+        baslik.setStyleSheet(
+            f"font-size:17px; font-weight:700; color:{RENK['metin']}; padding-bottom:6px;")
         sol.addWidget(baslik)
+
+        # Form kartı — stil sadece bu QFrame içine uygulanır
+        form_kart = QFrame(); form_kart.setObjectName("FormKart")
+        form_kart.setStyleSheet(
+            f"QFrame#FormKart {{ background:{RENK['yuzey']}; border-radius:10px;"
+            f"  border:1px solid {RENK['cizgi']}; }}")
+        flay = QFormLayout(form_kart)
+        flay.setContentsMargins(16, 14, 16, 14)
+        flay.setSpacing(10)
+        flay.setLabelAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        flay.setFormAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
 
         # Kayıtlı müşteri
         self.musteri_cb = QComboBox()
         self.musteri_cb.setMinimumHeight(38)
         self.musteri_cb.addItem("— Manuel Giriş —", None)
         self.musteri_cb.currentIndexChanged.connect(self._musteri_sec)
-        sol.addWidget(QLabel("Kayıtlı Müşteri"))
-        sol.addWidget(self.musteri_cb)
+        flay.addRow("Kayıtlı Müşteri", self.musteri_cb)
 
-        # Ayırıcı çizgi
-        cizgi = QFrame(); cizgi.setFrameShape(QFrame.Shape.HLine)
-        cizgi.setStyleSheet("color:#333;"); sol.addWidget(cizgi)
+        sep = QFrame(); sep.setFrameShape(QFrame.Shape.HLine)
+        sep.setStyleSheet(f"border:none; border-top:1px solid {RENK['cizgi']};")
+        sep.setFixedHeight(1)
+        flay.addRow(sep)
 
         # Alıcı alanları
         self.alici_adi     = QLineEdit(); self.alici_adi.setPlaceholderText("Alıcı adı soyadı *")
         self.alici_adi.setMinimumHeight(38)
-        self.alici_adres   = QLineEdit(); self.alici_adres.setPlaceholderText("Adres")
+        self.alici_adres   = QLineEdit(); self.alici_adres.setPlaceholderText("Cadde, ilçe, şehir")
         self.alici_adres.setMinimumHeight(38)
         self.alici_telefon = QLineEdit(); self.alici_telefon.setPlaceholderText("05XX XXX XXXX")
         self.alici_telefon.setMinimumHeight(38)
         self.icerik        = QLineEdit(); self.icerik.setPlaceholderText("Ürün / içerik açıklaması")
         self.icerik.setMinimumHeight(38)
 
-        for lbl_txt, w in [("Alıcı Adı *", self.alici_adi),
-                            ("Adres",       self.alici_adres),
-                            ("Telefon",     self.alici_telefon),
-                            ("İçerik",      self.icerik)]:
-            sol.addWidget(QLabel(lbl_txt))
-            sol.addWidget(w)
+        flay.addRow("Alıcı Adı *", self.alici_adi)
+        flay.addRow("Adres",       self.alici_adres)
+        flay.addRow("Telefon",     self.alici_telefon)
+        flay.addRow("İçerik",      self.icerik)
+        sol.addWidget(form_kart)
 
         self.btn = QPushButton("🖨  Etiket Oluştur & Kaydet")
-        self.btn.setMinimumHeight(44)
+        self.btn.setMinimumHeight(46)
         self.btn.setStyleSheet(
-            "background:#C0392B; color:#fff; font-weight:700; font-size:14px;"
-            "border-radius:8px; border:none; margin-top:8px;"
+            f"QPushButton {{ background:{RENK['aksan']}; color:#fff; font-weight:700;"
+            f"  font-size:14px; border-radius:8px; border:none; }}"
+            f"QPushButton:disabled {{ background:{RENK['cizgi_koyu']}; color:#666; }}"
         )
         self.btn.clicked.connect(self._olustur)
         sol.addWidget(self.btn)
 
         self.durum_lbl = QLabel("")
-        self.durum_lbl.setStyleSheet("color:#4ade80; font-size:12px; font-weight:600;")
+        self.durum_lbl.setStyleSheet(
+            f"color:{RENK['yesil']}; font-size:12px; font-weight:600;")
         sol.addWidget(self.durum_lbl)
         sol.addStretch()
-
-        # Stil
-        self.setStyleSheet(self.ALAN_STIL + f" QWidget{{ background:{RENK['zemin']}; }}")
 
         # ── SAĞ: Son Kargolar ────────────────────────────────────────────
         sag = QVBoxLayout()
@@ -254,11 +270,16 @@ class YeniKargoSayfasi(QWidget):
         self.gecmis.verticalHeader().setVisible(False)
         self.gecmis.setAlternatingRowColors(True)
         self.gecmis.setStyleSheet(
-            f"QTableWidget{{ background:#1a1a1a; color:#ddd; gridline-color:#2a2a2a;"
-            f"  border:1px solid #2a2a2a; border-radius:6px; font-size:12px; }}"
-            f"QHeaderView::section{{ background:#222; color:#888; font-size:11px;"
-            f"  font-weight:700; border:none; padding:4px; }}"
-            f"QTableWidget::item:selected{{ background:#C0392B33; }}"
+            f"QTableWidget {{ background:{RENK['yuzey']}; color:{RENK['metin']};"
+            f"  gridline-color:{RENK['cizgi']}; border:1px solid {RENK['cizgi']};"
+            f"  border-radius:6px; font-size:12px;"
+            f"  alternate-background-color:{RENK['yuzey2']}; }}"
+            f"QTableWidget::item {{ color:{RENK['metin']}; padding:4px 8px; border:none; }}"
+            f"QTableWidget::item:selected {{ background:{RENK['aksan_bg']};"
+            f"  color:{RENK['metin']}; }}"
+            f"QHeaderView::section {{ background:{RENK['yuzey2']}; color:{RENK['metin2']};"
+            f"  font-size:11px; font-weight:700; border:none;"
+            f"  border-bottom:1px solid {RENK['cizgi']}; padding:5px 8px; }}"
         )
         hh = self.gecmis.horizontalHeader()
         hh.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
