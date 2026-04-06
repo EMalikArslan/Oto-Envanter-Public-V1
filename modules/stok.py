@@ -628,50 +628,73 @@ class StokSayfasi(QWidget):
             mask &= arama_str.str.contains(ara, regex=False, na=False)
         self._tabloyu_doldur(self.df[mask])
 
+    # QColor nesnelerini bir kez oluştur — döngüde tekrar new yapma
+    _C_AKSAN   = QColor(RENK["aksan"])
+    _C_YESIL   = QColor(RENK["yesil"])
+    _C_MAVI    = QColor(RENK["mavi"])
+    _C_METIN3  = QColor(RENK["metin3"])
+    _C_SATIR_BG = QColor("#FFF8F8")
+    _FONT_BOLD = QFont("", -1, QFont.Weight.Bold)
+    _ALIGN     = Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft
+    _SUTUNLAR  = ["id","kategori","marka","yaygin_ad","motor",
+                  "ref1","ref2","ref3","ref4","ref5",
+                  "fiyat","depoda_adet","turda_adet","etiket_basildi"]
+    _SUTUN_IDX = {k: i for i, k in enumerate(_SUTUNLAR)}
+
     def _tabloyu_doldur(self, d):
+        MAX_SATIR = 750  # sınırsız satır main thread'i dondurur
+        toplam = len(d)
+        if toplam > MAX_SATIR:
+            d = d.iloc[:MAX_SATIR]
         self.tablo.setSortingEnabled(False)
-        self.tablo.clearContents()   # Eski item widget'ları bellekten temizle
-        self.tablo.setRowCount(len(d))
-        sutunlar = ["id","kategori","marka","yaygin_ad","motor",
-                    "ref1","ref2","ref3","ref4","ref5",
-                    "fiyat","depoda_adet","turda_adet","etiket_basildi"]
+        self.tablo.setUpdatesEnabled(False)   # ← repaint'leri toplu yap — kritik!
+        try:
+            self.tablo.clearContents()
+            self.tablo.setRowCount(len(d))
 
-        for ri, (_, row) in enumerate(d.iterrows()):
-            for ci, key in enumerate(sutunlar):
-                val = row.get(key, "-")
-                # depoda_adet / turda_adet için özel gösterim
-                if key == "depoda_adet":
-                    val_str = f"{int(val)} adet" if pd.notna(val) else "0 adet"
-                elif key == "turda_adet":
-                    val_str = f"{int(val)}" if pd.notna(val) and int(val) > 0 else "-"
-                elif key == "etiket_basildi":
-                    bek = row.get("etiket_bekleyen", 0)
-                    val_str = f"⚠ {int(bek)} bekliyor" if bek > 0 else "✓ Tümü etiketli"
-                else:
-                    val_str = str(val) if not pd.isna(val) else "-"
+            for ri, (_, row) in enumerate(d.iterrows()):
+                depoda = int(row.get("depoda_adet", 0) or 0)
+                bek    = int(row.get("etiket_bekleyen", 0) or 0)
+                satir_bos = depoda <= 0
 
-                item = _NumericItem(val_str) if key == "id" else QTableWidgetItem(val_str)
-                item.setTextAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
+                for ci, key in enumerate(self._SUTUNLAR):
+                    val = row.get(key, "-")
+                    if key == "depoda_adet":
+                        val_str = f"{depoda} adet"
+                    elif key == "turda_adet":
+                        turda = int(val or 0) if pd.notna(val) else 0
+                        val_str = str(turda) if turda > 0 else "-"
+                    elif key == "etiket_basildi":
+                        val_str = f"⚠ {bek} bekliyor" if bek > 0 else "✓ Tümü etiketli"
+                    else:
+                        val_str = str(val) if pd.notna(val) else "-"
 
-                depoda = row.get("depoda_adet", 0)
-                if key == "etiket_basildi":
-                    bek = row.get("etiket_bekleyen", 0)
-                    item.setForeground(QColor(RENK["aksan"] if bek > 0 else RENK["yesil"]))
-                    item.setFont(QFont("", -1, QFont.Weight.Bold))
-                elif key == "turda_adet" and int(val or 0) > 0:
-                    item.setForeground(QColor(RENK["mavi"]))
-                elif depoda <= 0 and key not in ("etiket_basildi", "depoda_adet", "turda_adet"):
-                    item.setForeground(QColor(RENK["metin3"]))
+                    item = _NumericItem(val_str) if key == "id" else QTableWidgetItem(val_str)
+                    item.setTextAlignment(self._ALIGN)
 
-                self.tablo.setItem(ri, ci, item)
+                    if key == "etiket_basildi":
+                        item.setForeground(self._C_AKSAN if bek > 0 else self._C_YESIL)
+                        item.setFont(self._FONT_BOLD)
+                    elif key == "turda_adet" and int(val or 0) > 0:
+                        item.setForeground(self._C_MAVI)
+                    elif satir_bos and key not in ("etiket_basildi", "depoda_adet", "turda_adet"):
+                        item.setForeground(self._C_METIN3)
 
-            # Satır arka planı
-            if row.get("depoda_adet", 0) <= 0:
-                for c in range(14):
-                    it = self.tablo.item(ri, c)
-                    if it: it.setBackground(QColor("#FFF8F8"))
+                    if satir_bos:
+                        item.setBackground(self._C_SATIR_BG)
 
-        self.tablo.setSortingEnabled(True)
+                    self.tablo.setItem(ri, ci, item)
+        finally:
+            self.tablo.setUpdatesEnabled(True)   # ← her zaman serbest bırak
+            self.tablo.setSortingEnabled(True)
+
+        # Durum etiketi — kaç satır gösterildiğini bildir
+        if hasattr(self, "lbl_secim"):
+            if toplam > MAX_SATIR:
+                self.lbl_secim.setText(
+                    f"{toplam} kayıt — ilk {MAX_SATIR} gösteriliyor (arama ile daralt)")
+            else:
+                self.lbl_secim.setText("")
 
     def _secim_guncelle(self):
         n = len(self.tablo.selectionModel().selectedRows())
