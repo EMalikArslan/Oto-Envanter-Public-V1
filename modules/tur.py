@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
     QHeaderView, QAbstractItemView, QFrame, QComboBox, QTextEdit,
     QMessageBox, QDialog, QDateEdit, QSpinBox
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QDate, QTimer
+from PyQt6.QtCore import Qt, pyqtSignal, QDate, QTimer, QThread
 from PyQt6.QtGui import QColor, QFont
 
 from core.database import get_conn, barkod_coz
