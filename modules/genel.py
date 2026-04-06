@@ -104,18 +104,23 @@ class IstatistikSayfasi(QWidget):
         self.yukle()
 
     def _build(self):
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.Shape.NoFrame)
-        ic = QWidget()
-        self._lay = QVBoxLayout(ic)
-        self._lay.setContentsMargins(24, 20, 24, 20)
-        self._lay.setSpacing(20)
-        scroll.setWidget(ic)
-
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
-        outer.addWidget(scroll)
+
+        # ── Tab yapısı: Özet / Detay ──────────────────────────────────────
+        tabs = QTabWidget()
+        outer.addWidget(tabs)
+
+        # ── Tab 1: Özet ───────────────────────────────────────────────────
+        ozet_scroll = QScrollArea()
+        ozet_scroll.setWidgetResizable(True)
+        ozet_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        ozet_ic = QWidget()
+        self._lay = QVBoxLayout(ozet_ic)
+        self._lay.setContentsMargins(24, 20, 24, 20)
+        self._lay.setSpacing(20)
+        ozet_scroll.setWidget(ozet_ic)
+        tabs.addTab(ozet_scroll, "İstatistik")
 
         # ── Üst stat kartları ────────────────────────────────────────────
         self.s_toplam  = StatKart("Toplam Ürün Kalemi", "—", RENK["metin2"])
@@ -178,27 +183,6 @@ class IstatistikSayfasi(QWidget):
         self._lay.addLayout(kat_grid)
         self._lay.addWidget(AyiriciCizgi())
 
-        # ── Marka/Kategori detay tablosu ─────────────────────────────────
-        lbl_marka = QLabel("MARKA × KATEGORİ DETAY")
-        lbl_marka.setStyleSheet(
-            f"font-size: 10px; font-weight: 700; letter-spacing: 2px; "
-            f"color: {RENK['metin2']};")
-        self._lay.addWidget(lbl_marka)
-
-        self.detay_tablo = QTableWidget()
-        self.detay_tablo.setColumnCount(5)
-        self.detay_tablo.setHorizontalHeaderLabels(
-            ["MARKA", "KATEGORİ", "STOK KALEMI", "STOKTA VAR", "STOK SIFIR"])
-        self.detay_tablo.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.detay_tablo.verticalHeader().setVisible(False)
-        self.detay_tablo.setAlternatingRowColors(True)
-        self.detay_tablo.setMaximumHeight(340)
-        hh = self.detay_tablo.horizontalHeader()
-        hh.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        hh.setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
-        self.detay_tablo.verticalHeader().setDefaultSectionSize(32)
-        self._lay.addWidget(self.detay_tablo)
-
         # ── Marka bar listesi ─────────────────────────────────────────────
         lbl_bar = QLabel("MARKA BAZLI STOK DAĞILIMI")
         lbl_bar.setStyleSheet(
@@ -210,6 +194,32 @@ class IstatistikSayfasi(QWidget):
         self.bar_container.setSpacing(4)
         self._lay.addLayout(self.bar_container)
         self._lay.addStretch()
+
+        # ── Tab 2: Marka × Kategori Detay ────────────────────────────────
+        detay_w = QWidget()
+        detay_lay = QVBoxLayout(detay_w)
+        detay_lay.setContentsMargins(20, 16, 20, 16)
+        detay_lay.setSpacing(10)
+
+        lbl_marka = QLabel("MARKA × KATEGORİ DETAY")
+        lbl_marka.setStyleSheet(
+            f"font-size: 10px; font-weight: 700; letter-spacing: 2px; "
+            f"color: {RENK['metin2']};")
+        detay_lay.addWidget(lbl_marka)
+
+        self.detay_tablo = QTableWidget()
+        self.detay_tablo.setColumnCount(5)
+        self.detay_tablo.setHorizontalHeaderLabels(
+            ["MARKA", "KATEGORİ", "STOK KALEMI", "STOKTA VAR", "STOK SIFIR"])
+        self.detay_tablo.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.detay_tablo.verticalHeader().setVisible(False)
+        self.detay_tablo.setAlternatingRowColors(True)
+        hh = self.detay_tablo.horizontalHeader()
+        hh.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        hh.setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
+        self.detay_tablo.verticalHeader().setDefaultSectionSize(32)
+        detay_lay.addWidget(self.detay_tablo, 1)
+        tabs.addTab(detay_w, "Marka × Kategori Detay")
 
     def yukle(self):
         conn = get_conn()
@@ -453,7 +463,13 @@ class KuralDialog(QDialog):
     def __init__(self, parent=None, mevcut=None):
         super().__init__(parent)
         self.setWindowTitle("Eksik Kuralı"); self.setMinimumSize(460,520)
-        self.setStyleSheet(f"background-color:{RENK['yuzey']}; color:{RENK['metin']};")
+        self.setStyleSheet(
+            f"QDialog {{ background:{RENK['yuzey']}; color:{RENK['metin']}; }}"
+            f"QPushButton#BtnAksan {{ background:{RENK['aksan']}; color:#FFFFFF; border-radius:6px; padding:6px 18px; font-weight:600; }}"
+            f"QPushButton#BtnAksan:hover {{ background:{RENK['aksan2']}; }}"
+            f"QPushButton#BtnIkincil {{ background:transparent; color:{RENK['metin']}; border:1.5px solid {RENK['cizgi_koyu']}; border-radius:6px; padding:6px 18px; }}"
+            f"QPushButton#BtnIkincil:hover {{ border-color:{RENK['metin']}; background:{RENK['yuzey2']}; }}"
+        )
         lay = QVBoxLayout(self); lay.setSpacing(10); lay.setContentsMargins(24,20,24,20)
         lbl=QLabel("Eksik Kuralı Tanımla"); lbl.setStyleSheet("font-size:16px;font-weight:700;")
         lay.addWidget(lbl); lay.addWidget(AyiriciCizgi())
@@ -485,8 +501,15 @@ class KuralDialog(QDialog):
         # Ürün arama kutusu
         self.ara_urun = QLineEdit()
         self.ara_urun.setPlaceholderText("Ürün ara...")
-        self.ara_urun.setMinimumHeight(32)
+        self.ara_urun.setMinimumHeight(34)
         self.ara_urun.setEnabled(False)
+        self.ara_urun.setStyleSheet(
+            f"QLineEdit {{ background:{RENK['yuzey2']}; border:1.5px solid {RENK['cizgi']};"
+            f"  border-radius:6px; color:{RENK['metin']}; padding:4px 10px; font-size:13px; }}"
+            f"QLineEdit:focus {{ border-color:{RENK['aksan']}; }}"
+            f"QLineEdit:disabled {{ background:{RENK['cizgi']}; color:{RENK['metin3']};"
+            f"  border-color:{RENK['cizgi']}; }}"
+        )
         self.ara_urun.textChanged.connect(self._urun_filtrele)
         lay.addWidget(self.ara_urun)
 

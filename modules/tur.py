@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
     QHeaderView, QAbstractItemView, QFrame, QComboBox, QTextEdit,
     QMessageBox, QDialog, QDateEdit, QSpinBox
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QDate, QTimer
+from PyQt6.QtCore import Qt, pyqtSignal, QDate, QTimer, QThread
 from PyQt6.QtGui import QColor, QFont
 
 from core.database import get_conn, barkod_coz
@@ -78,7 +78,7 @@ class UrunAramaPaneli(QWidget):
         self.tablo.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.tablo.verticalHeader().setVisible(False)
         self.tablo.setAlternatingRowColors(True)
-        self.tablo.setMaximumHeight(200)
+        self.tablo.setMinimumHeight(160)
         hh = self.tablo.horizontalHeader()
         hh.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         hh.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
@@ -153,7 +153,7 @@ class TuraCikisSayfasi(QWidget):
         lay = QVBoxLayout(self)
         lay.setContentsMargins(20,16,20,16); lay.setSpacing(12)
 
-        # Tur seçici
+        # ── Tur seçici ────────────────────────────────────────────────────
         tur_lay = QHBoxLayout()
         lbl = QLabel("Aktif Tur:")
         lbl.setStyleSheet(f"font-weight:700; color:{RENK['metin2']}; font-size:12px;")
@@ -166,17 +166,25 @@ class TuraCikisSayfasi(QWidget):
         lay.addLayout(tur_lay)
         lay.addWidget(AyiriciCizgi())
 
-        # Stat kartları
+        # ── Stat kartları ─────────────────────────────────────────────────
         stat = QHBoxLayout(); stat.setSpacing(12)
         self.s_yuklu  = StatKart("Bu Turda Yüklü", "0", RENK["mavi"])
         self.s_toplam = StatKart("Toplam Taranan",  "0", RENK["metin2"])
         stat.addWidget(self.s_yuklu); stat.addWidget(self.s_toplam); stat.addStretch()
         lay.addLayout(stat)
 
-        # Splitter: sol barkod / sağ arama
-        splitter = QSplitter(Qt.Orientation.Horizontal)
+        # ── Tab yapısı ────────────────────────────────────────────────────
+        self.tabs = QTabWidget()
+        lay.addWidget(self.tabs, 1)
 
-        # Sol: Barkod girişi
+        # ── Tab 1: Ürün Ekle ─────────────────────────────────────────────
+        ekle_w = QWidget()
+        ekle_lay = QVBoxLayout(ekle_w)
+        ekle_lay.setContentsMargins(12,12,12,12); ekle_lay.setSpacing(10)
+
+        hsplit = QSplitter(Qt.Orientation.Horizontal)
+
+        # Sol: Barkod
         sol = QWidget()
         sl = QVBoxLayout(sol); sl.setContentsMargins(0,0,8,0); sl.setSpacing(8)
         kart = QFrame(); kart.setObjectName("Kart")
@@ -184,34 +192,36 @@ class TuraCikisSayfasi(QWidget):
                            f"border:1px solid {RENK['cizgi']};}}")
         kl = QVBoxLayout(kart); kl.setContentsMargins(14,12,14,12); kl.setSpacing(8)
         lbl2 = QLabel("BARKOD / ID OKUT")
-        lbl2.setStyleSheet(f"font-size:10px; font-weight:700; letter-spacing:2px; color:{RENK['metin2']};")
+        lbl2.setStyleSheet(f"font-size:10px;font-weight:700;letter-spacing:2px;color:{RENK['metin2']};")
         kl.addWidget(lbl2)
         self.barkod_in = BarkodInput()
         self.barkod_in.barkod_okundu.connect(self._isle)
         kl.addWidget(self.barkod_in)
         self.lbl_flash = QLabel("")
-        self.lbl_flash.setStyleSheet("font-size:12px; font-weight:700;")
+        self.lbl_flash.setStyleSheet("font-size:12px;font-weight:700;")
         kl.addWidget(self.lbl_flash)
-        sl.addWidget(kart)
-        splitter.addWidget(sol)
+        kl.addStretch()
+        sl.addWidget(kart); sl.addStretch()
+        hsplit.addWidget(sol)
 
-        # Sağ: Arama ile seç
+        # Sağ: Listeden seç
         sag = QWidget()
-        sagl = QVBoxLayout(sag); sagl.setContentsMargins(8,0,0,0); sagl.setSpacing(8)
+        sagl = QVBoxLayout(sag); sagl.setContentsMargins(8,0,0,0); sagl.setSpacing(6)
         lbl3 = QLabel("VEYA LİSTEDEN SEÇ")
-        lbl3.setStyleSheet(f"font-size:10px; font-weight:700; letter-spacing:2px; color:{RENK['metin2']};")
+        lbl3.setStyleSheet(f"font-size:10px;font-weight:700;letter-spacing:2px;color:{RENK['metin2']};")
         sagl.addWidget(lbl3)
         self.arama = UrunAramaPaneli(sadece_depoda=True)
         self.arama.secildi.connect(self._listeden_isle)
-        sagl.addWidget(self.arama)
-        splitter.addWidget(sag)
-        splitter.setSizes([350, 550])
-        lay.addWidget(splitter)
+        sagl.addWidget(self.arama, 1)
+        hsplit.addWidget(sag)
+        hsplit.setSizes([300, 600])
+        ekle_lay.addWidget(hsplit, 1)
+        self.tabs.addTab(ekle_w, "➕  Ürün Ekle")
 
-        # Yüklü ürünler tablosu
-        lbl4 = QLabel("BU TURDA YÜKLÜ ÜRÜNlER")
-        lbl4.setStyleSheet(f"font-size:10px; font-weight:700; letter-spacing:2px; color:{RENK['metin2']};")
-        lay.addWidget(lbl4)
+        # ── Tab 2: Yüklü Ürünler ─────────────────────────────────────────
+        yuklu_w = QWidget()
+        yuklu_lay = QVBoxLayout(yuklu_w)
+        yuklu_lay.setContentsMargins(12,12,12,12); yuklu_lay.setSpacing(8)
 
         self.tablo = QTableWidget()
         self.tablo.setColumnCount(6)
@@ -227,13 +237,14 @@ class TuraCikisSayfasi(QWidget):
         hh.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         hh.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
         self.tablo.verticalHeader().setDefaultSectionSize(30)
-        lay.addWidget(self.tablo, 1)
+        yuklu_lay.addWidget(self.tablo, 1)
 
-        alt = QHBoxLayout()
+        btn_sil_lay = QHBoxLayout()
         btn_sil = QPushButton("Seçili Kaydı Kaldır"); btn_sil.setObjectName("BtnTehlike")
         btn_sil.clicked.connect(self._kaldir)
-        alt.addWidget(btn_sil); alt.addStretch()
-        lay.addLayout(alt)
+        btn_sil_lay.addWidget(btn_sil); btn_sil_lay.addStretch()
+        yuklu_lay.addLayout(btn_sil_lay)
+        self.tabs.addTab(yuklu_w, "📦  Yüklü Ürünler (0)")
 
     def _turleri_yukle(self):
         self.cb_tur.blockSignals(True); self.cb_tur.clear()
@@ -314,12 +325,14 @@ class TuraCikisSayfasi(QWidget):
         self._flash(f"✓ {bilgi.get('marka','')} / {bilgi.get('yaygin_ad','')} — yüklendi",
                     RENK["yesil"])
         self._tabloyu_yenile()
-        self.arama._ara()   # arama listesini güncelle
+        self.arama._ara()
+        self.tabs.setCurrentIndex(1)   # Yüklü ürünler sekmesine geç
 
     def _tabloyu_yenile(self):
         if not self._tur_id:
             self.tablo.setRowCount(0)
-            self.s_yuklu.set_deger(0); self.s_toplam.set_deger(0); return
+            self.s_yuklu.set_deger(0); self.s_toplam.set_deger(0)
+            self.tabs.setTabText(1, "📦  Yüklü Ürünler (0)"); return
         conn = get_conn()
         rows = conn.execute("""
             SELECT tu.barkod_id, tu.cikis_zamani,
@@ -342,6 +355,7 @@ class TuraCikisSayfasi(QWidget):
                 self.tablo.setItem(i, j, item)
         n = len(rows)
         self.s_yuklu.set_deger(n); self.s_toplam.set_deger(n)
+        self.tabs.setTabText(1, f"📦  Yüklü Ürünler ({n})")
 
     def _kaldir(self):
         rows = self.tablo.selectionModel().selectedRows()
@@ -401,8 +415,16 @@ class TurDonusSayfasi(QWidget):
             stat.addWidget(s)
         stat.addStretch(); lay.addLayout(stat)
 
-        # Splitter: sol barkod / sağ arama
-        splitter = QSplitter(Qt.Orientation.Horizontal)
+        # ── Tab yapısı ────────────────────────────────────────────────────
+        self.tabs = QTabWidget()
+        lay.addWidget(self.tabs, 1)
+
+        # ── Tab 1: Ürün Tara ─────────────────────────────────────────────
+        tara_w = QWidget()
+        tara_lay = QVBoxLayout(tara_w)
+        tara_lay.setContentsMargins(12,12,12,12); tara_lay.setSpacing(10)
+
+        hsplit = QSplitter(Qt.Orientation.Horizontal)
 
         sol = QWidget()
         sl = QVBoxLayout(sol); sl.setContentsMargins(0,0,8,0); sl.setSpacing(8)
@@ -411,52 +433,59 @@ class TurDonusSayfasi(QWidget):
                            f"border:1px solid {RENK['cizgi']};}}")
         kl = QVBoxLayout(kart); kl.setContentsMargins(14,12,14,12); kl.setSpacing(8)
         lbl2 = QLabel("ARAÇTAN İNİRKEN OKUT")
-        lbl2.setStyleSheet(f"font-size:10px; font-weight:700; letter-spacing:2px; color:{RENK['metin2']};")
+        lbl2.setStyleSheet(f"font-size:10px;font-weight:700;letter-spacing:2px;color:{RENK['metin2']};")
         kl.addWidget(lbl2)
         self.barkod_in = BarkodInput("Dönen ürün barkodunu okutun...")
         self.barkod_in.barkod_okundu.connect(self._isle)
         kl.addWidget(self.barkod_in)
         self.lbl_flash = QLabel("")
-        self.lbl_flash.setStyleSheet("font-size:12px; font-weight:700;")
+        self.lbl_flash.setStyleSheet("font-size:12px;font-weight:700;")
         kl.addWidget(self.lbl_flash)
-        sl.addWidget(kart)
-        splitter.addWidget(sol)
+        kl.addStretch()
+        sl.addWidget(kart); sl.addStretch()
+        hsplit.addWidget(sol)
 
         sag = QWidget()
-        sagl = QVBoxLayout(sag); sagl.setContentsMargins(8,0,0,0); sagl.setSpacing(8)
+        sagl = QVBoxLayout(sag); sagl.setContentsMargins(8,0,0,0); sagl.setSpacing(6)
         lbl3 = QLabel("VEYA TURDA OLANLARDAN SEÇ")
-        lbl3.setStyleSheet(f"font-size:10px; font-weight:700; letter-spacing:2px; color:{RENK['metin2']};")
+        lbl3.setStyleSheet(f"font-size:10px;font-weight:700;letter-spacing:2px;color:{RENK['metin2']};")
         sagl.addWidget(lbl3)
         self.arama = UrunAramaPaneli(sadece_depoda=False)
         self.arama.secildi.connect(self._listeden_isle)
-        sagl.addWidget(self.arama)
-        splitter.addWidget(sag)
-        splitter.setSizes([350, 550])
-        lay.addWidget(splitter)
+        sagl.addWidget(self.arama, 1)
+        hsplit.addWidget(sag)
+        hsplit.setSizes([300, 600])
+        tara_lay.addWidget(hsplit, 1)
+        self.tabs.addTab(tara_w, "📷  Ürün Tara")
 
-        # İki tablo: sol=çıkan, sağ=dönen
-        tablo_lay = QHBoxLayout(); tablo_lay.setSpacing(12)
+        # ── Tab 2: Tura Çıkan / Dönen ────────────────────────────────────
+        liste_w = QWidget()
+        liste_lay = QVBoxLayout(liste_w)
+        liste_lay.setContentsMargins(12,12,12,12); liste_lay.setSpacing(8)
 
-        sol2 = QWidget(); sl2 = QVBoxLayout(sol2); sl2.setContentsMargins(0,0,0,0)
+        tablo_hsplit = QSplitter(Qt.Orientation.Horizontal)
+
+        sol2 = QWidget(); sl2 = QVBoxLayout(sol2); sl2.setContentsMargins(0,0,4,0); sl2.setSpacing(4)
         lbl_c = QLabel("TURA ÇIKAN")
-        lbl_c.setStyleSheet(f"font-size:10px; font-weight:700; letter-spacing:2px; color:{RENK['mavi']};")
+        lbl_c.setStyleSheet(f"font-size:10px;font-weight:700;letter-spacing:2px;color:{RENK['mavi']};")
         sl2.addWidget(lbl_c)
-        self.tablo_cikan = self._tablo_olustur(); sl2.addWidget(self.tablo_cikan)
-        tablo_lay.addWidget(sol2)
+        self.tablo_cikan = self._tablo_olustur(); sl2.addWidget(self.tablo_cikan, 1)
+        tablo_hsplit.addWidget(sol2)
 
-        sag2 = QWidget(); sagl2 = QVBoxLayout(sag2); sagl2.setContentsMargins(0,0,0,0)
+        sag2 = QWidget(); sagl2 = QVBoxLayout(sag2); sagl2.setContentsMargins(4,0,0,0); sagl2.setSpacing(4)
         lbl_d = QLabel("DÖNEN")
-        lbl_d.setStyleSheet(f"font-size:10px; font-weight:700; letter-spacing:2px; color:{RENK['yesil']};")
+        lbl_d.setStyleSheet(f"font-size:10px;font-weight:700;letter-spacing:2px;color:{RENK['yesil']};")
         sagl2.addWidget(lbl_d)
-        self.tablo_donen = self._tablo_olustur(); sagl2.addWidget(self.tablo_donen)
-        tablo_lay.addWidget(sag2)
-        lay.addLayout(tablo_lay, 1)
+        self.tablo_donen = self._tablo_olustur(); sagl2.addWidget(self.tablo_donen, 1)
+        tablo_hsplit.addWidget(sag2)
+        liste_lay.addWidget(tablo_hsplit, 1)
 
-        alt = QHBoxLayout()
+        btn_lay = QHBoxLayout()
         btn_tam = QPushButton("✓  Turu Tamamla — Satılanları Stoktan Düş")
         btn_tam.setObjectName("BtnAksan"); btn_tam.clicked.connect(self._tamamla)
-        alt.addStretch(); alt.addWidget(btn_tam)
-        lay.addLayout(alt)
+        btn_lay.addStretch(); btn_lay.addWidget(btn_tam)
+        liste_lay.addLayout(btn_lay)
+        self.tabs.addTab(liste_w, "📋  Tura Çıkan / Dönen (0)")
 
     def _tablo_olustur(self):
         t = QTableWidget(); t.setColumnCount(4)
@@ -545,6 +574,7 @@ class TurDonusSayfasi(QWidget):
             t.finished.connect(t.deleteLater); t.start()
         self._flash(f"✓ {marka} / {ad} — iade alındı", RENK["yesil"])
         self._tablolari_yenile(); self.arama._ara()
+        self.tabs.setCurrentIndex(1)
 
     def _tablolari_yenile(self):
         cikan = list(self._cikanlar.values())
@@ -572,6 +602,8 @@ class TurDonusSayfasi(QWidget):
                 it = self.tablo_cikan.item(i, j)
                 if it: it.setForeground(QColor(c))
         doldur(self.tablo_donen, donen, RENK["yesil"])
+        n = len(cikan)
+        self.tabs.setTabText(1, f"📋  Tura Çıkan / Dönen ({n})")
 
     def _tamamla(self):
         if not self._tur_id: return
@@ -634,7 +666,13 @@ class YeniTurDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Yeni Tur Ekle"); self.setMinimumWidth(400)
-        self.setStyleSheet(f"background:{RENK['yuzey']}; color:{RENK['metin']};")
+        self.setStyleSheet(
+            f"QDialog {{ background:{RENK['yuzey']}; color:{RENK['metin']}; }}"
+            f"QPushButton#BtnAksan {{ background:{RENK['aksan']}; color:#FFFFFF; border-radius:6px; padding:6px 18px; font-weight:600; }}"
+            f"QPushButton#BtnAksan:hover {{ background:{RENK['aksan2']}; }}"
+            f"QPushButton#BtnIkincil {{ background:transparent; color:{RENK['metin']}; border:1.5px solid {RENK['cizgi_koyu']}; border-radius:6px; padding:6px 18px; }}"
+            f"QPushButton#BtnIkincil:hover {{ border-color:{RENK['metin']}; background:{RENK['yuzey2']}; }}"
+        )
         lay = QVBoxLayout(self); lay.setSpacing(12); lay.setContentsMargins(24,24,24,24)
         lbl = QLabel("Yeni Tur Ekle"); lbl.setStyleSheet("font-size:16px; font-weight:700;")
         lay.addWidget(lbl); lay.addWidget(AyiriciCizgi())
