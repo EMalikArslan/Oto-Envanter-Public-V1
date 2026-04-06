@@ -78,7 +78,7 @@ class UrunAramaPaneli(QWidget):
         self.tablo.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.tablo.verticalHeader().setVisible(False)
         self.tablo.setAlternatingRowColors(True)
-        self.tablo.setMaximumHeight(200)
+        self.tablo.setMinimumHeight(160)
         hh = self.tablo.horizontalHeader()
         hh.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         hh.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
@@ -173,8 +173,14 @@ class TuraCikisSayfasi(QWidget):
         stat.addWidget(self.s_yuklu); stat.addWidget(self.s_toplam); stat.addStretch()
         lay.addLayout(stat)
 
-        # Splitter: sol barkod / sağ arama
-        splitter = QSplitter(Qt.Orientation.Horizontal)
+        # Dikey splitter: üst = barkod+arama, alt = yüklü ürünler
+        vsplit = QSplitter(Qt.Orientation.Vertical)
+
+        # ── Üst panel: barkod girişi ve listeden seçim ───────────────────
+        ust_w = QWidget()
+        ust_lay = QVBoxLayout(ust_w); ust_lay.setContentsMargins(0,0,0,4); ust_lay.setSpacing(8)
+
+        hsplit = QSplitter(Qt.Orientation.Horizontal)
 
         # Sol: Barkod girişi
         sol = QWidget()
@@ -192,8 +198,9 @@ class TuraCikisSayfasi(QWidget):
         self.lbl_flash = QLabel("")
         self.lbl_flash.setStyleSheet("font-size:12px; font-weight:700;")
         kl.addWidget(self.lbl_flash)
+        kl.addStretch()
         sl.addWidget(kart)
-        splitter.addWidget(sol)
+        hsplit.addWidget(sol)
 
         # Sağ: Arama ile seç
         sag = QWidget()
@@ -203,15 +210,19 @@ class TuraCikisSayfasi(QWidget):
         sagl.addWidget(lbl3)
         self.arama = UrunAramaPaneli(sadece_depoda=True)
         self.arama.secildi.connect(self._listeden_isle)
-        sagl.addWidget(self.arama)
-        splitter.addWidget(sag)
-        splitter.setSizes([350, 550])
-        lay.addWidget(splitter)
+        sagl.addWidget(self.arama, 1)
+        hsplit.addWidget(sag)
+        hsplit.setSizes([320, 580])
+        ust_lay.addWidget(hsplit, 1)
+        vsplit.addWidget(ust_w)
 
-        # Yüklü ürünler tablosu
-        lbl4 = QLabel("BU TURDA YÜKLÜ ÜRÜNlER")
+        # ── Alt panel: yüklü ürünler ─────────────────────────────────────
+        alt_w = QWidget()
+        alt_lay = QVBoxLayout(alt_w); alt_lay.setContentsMargins(0,4,0,0); alt_lay.setSpacing(6)
+
+        lbl4 = QLabel("BU TURDA YÜKLÜ ÜRÜNLER")
         lbl4.setStyleSheet(f"font-size:10px; font-weight:700; letter-spacing:2px; color:{RENK['metin2']};")
-        lay.addWidget(lbl4)
+        alt_lay.addWidget(lbl4)
 
         self.tablo = QTableWidget()
         self.tablo.setColumnCount(6)
@@ -227,13 +238,17 @@ class TuraCikisSayfasi(QWidget):
         hh.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         hh.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
         self.tablo.verticalHeader().setDefaultSectionSize(30)
-        lay.addWidget(self.tablo, 1)
+        alt_lay.addWidget(self.tablo, 1)
 
-        alt = QHBoxLayout()
+        btn_sil_lay = QHBoxLayout()
         btn_sil = QPushButton("Seçili Kaydı Kaldır"); btn_sil.setObjectName("BtnTehlike")
         btn_sil.clicked.connect(self._kaldir)
-        alt.addWidget(btn_sil); alt.addStretch()
-        lay.addLayout(alt)
+        btn_sil_lay.addWidget(btn_sil); btn_sil_lay.addStretch()
+        alt_lay.addLayout(btn_sil_lay)
+        vsplit.addWidget(alt_w)
+
+        vsplit.setSizes([320, 380])
+        lay.addWidget(vsplit, 1)
 
     def _turleri_yukle(self):
         self.cb_tur.blockSignals(True); self.cb_tur.clear()
@@ -401,8 +416,14 @@ class TurDonusSayfasi(QWidget):
             stat.addWidget(s)
         stat.addStretch(); lay.addLayout(stat)
 
-        # Splitter: sol barkod / sağ arama
-        splitter = QSplitter(Qt.Orientation.Horizontal)
+        # Dikey splitter: üst = barkod+arama, alt = çıkan/dönen tablolar
+        vsplit = QSplitter(Qt.Orientation.Vertical)
+
+        # ── Üst panel: barkod girişi ve listeden seçim ───────────────────
+        ust_w = QWidget()
+        ust_lay = QVBoxLayout(ust_w); ust_lay.setContentsMargins(0,0,0,4); ust_lay.setSpacing(8)
+
+        hsplit = QSplitter(Qt.Orientation.Horizontal)
 
         sol = QWidget()
         sl = QVBoxLayout(sol); sl.setContentsMargins(0,0,8,0); sl.setSpacing(8)
@@ -419,8 +440,9 @@ class TurDonusSayfasi(QWidget):
         self.lbl_flash = QLabel("")
         self.lbl_flash.setStyleSheet("font-size:12px; font-weight:700;")
         kl.addWidget(self.lbl_flash)
+        kl.addStretch()
         sl.addWidget(kart)
-        splitter.addWidget(sol)
+        hsplit.addWidget(sol)
 
         sag = QWidget()
         sagl = QVBoxLayout(sag); sagl.setContentsMargins(8,0,0,0); sagl.setSpacing(8)
@@ -429,12 +451,16 @@ class TurDonusSayfasi(QWidget):
         sagl.addWidget(lbl3)
         self.arama = UrunAramaPaneli(sadece_depoda=False)
         self.arama.secildi.connect(self._listeden_isle)
-        sagl.addWidget(self.arama)
-        splitter.addWidget(sag)
-        splitter.setSizes([350, 550])
-        lay.addWidget(splitter)
+        sagl.addWidget(self.arama, 1)
+        hsplit.addWidget(sag)
+        hsplit.setSizes([320, 580])
+        ust_lay.addWidget(hsplit, 1)
+        vsplit.addWidget(ust_w)
 
-        # İki tablo: sol=çıkan, sağ=dönen
+        # ── Alt panel: çıkan ve dönen tablolar ───────────────────────────
+        alt_w = QWidget()
+        alt_lay = QVBoxLayout(alt_w); alt_lay.setContentsMargins(0,4,0,0); alt_lay.setSpacing(8)
+
         tablo_lay = QHBoxLayout(); tablo_lay.setSpacing(12)
 
         sol2 = QWidget(); sl2 = QVBoxLayout(sol2); sl2.setContentsMargins(0,0,0,0)
@@ -450,13 +476,17 @@ class TurDonusSayfasi(QWidget):
         sagl2.addWidget(lbl_d)
         self.tablo_donen = self._tablo_olustur(); sagl2.addWidget(self.tablo_donen)
         tablo_lay.addWidget(sag2)
-        lay.addLayout(tablo_lay, 1)
+        alt_lay.addLayout(tablo_lay, 1)
 
-        alt = QHBoxLayout()
+        btn_lay = QHBoxLayout()
         btn_tam = QPushButton("✓  Turu Tamamla — Satılanları Stoktan Düş")
         btn_tam.setObjectName("BtnAksan"); btn_tam.clicked.connect(self._tamamla)
-        alt.addStretch(); alt.addWidget(btn_tam)
-        lay.addLayout(alt)
+        btn_lay.addStretch(); btn_lay.addWidget(btn_tam)
+        alt_lay.addLayout(btn_lay)
+        vsplit.addWidget(alt_w)
+
+        vsplit.setSizes([320, 380])
+        lay.addWidget(vsplit, 1)
 
     def _tablo_olustur(self):
         t = QTableWidget(); t.setColumnCount(4)
