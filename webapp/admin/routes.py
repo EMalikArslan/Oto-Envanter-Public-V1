@@ -239,7 +239,7 @@ def kargo_ekle():
     f  = request.form
     cur = db.execute("""
         INSERT INTO kargo (musteri_id, alici_adi, alici_adres, alici_telefon, icerik, durum)
-        VALUES (?,?,?,?,?,'hazirlaniyor')
+        VALUES (?,?,?,?,?,'HAZIRLANIYOR')
     """, (f.get("musteri_id") or None, f["alici_adi"], f.get("alici_adres",""),
           f.get("alici_telefon",""), f.get("icerik","")))
     kid = cur.lastrowid

@@ -149,9 +149,33 @@ class IstatistikSayfasi(QWidget):
             f"color: {RENK['metin2']};")
         self._lay.addWidget(lbl_kat)
 
-        self.kat_grid = QGridLayout()
-        self.kat_grid.setSpacing(12)
-        self._lay.addLayout(self.kat_grid)
+        # Kartlar bir kez oluşturulur, her güncellemede sadece label değerleri değişir
+        self._kat_lbl_n   = {}   # kat → büyük sayı label
+        self._kat_lbl_var = {}   # kat → "✓ N stokta" label
+        self._kat_lbl_bit = {}   # kat → "✗ N bitti" label
+        kat_grid = QGridLayout()
+        kat_grid.setSpacing(12)
+        for col, kat in enumerate(["Beyin", "ABS", "Plastik"]):
+            renk = KAT_RENK.get(kat, RENK["metin2"])
+            kart = QFrame(); kart.setObjectName("Kart")
+            kart.setStyleSheet(
+                f"QFrame#Kart {{ background: {RENK['yuzey']}; border-radius: 10px; "
+                f"border: 1px solid {RENK['cizgi']}; border-top: 4px solid {renk}; }}")
+            klay = QVBoxLayout(kart); klay.setContentsMargins(16,14,16,14); klay.setSpacing(6)
+            lbl_ad = QLabel(kat.upper())
+            lbl_ad.setStyleSheet(f"font-size:11px;font-weight:700;letter-spacing:1.5px;color:{renk};")
+            lbl_n = QLabel("—")
+            lbl_n.setStyleSheet(f"font-size:32px;font-weight:700;color:{RENK['metin']};")
+            alt = QHBoxLayout(); alt.setSpacing(12)
+            lbl_var = QLabel("✓ — stokta"); lbl_var.setStyleSheet(f"font-size:11px;color:{RENK['yesil']};")
+            lbl_bit = QLabel("✗ — bitti");  lbl_bit.setStyleSheet(f"font-size:11px;color:{RENK['aksan']};")
+            alt.addWidget(lbl_var); alt.addWidget(lbl_bit); alt.addStretch()
+            klay.addWidget(lbl_ad); klay.addWidget(lbl_n); klay.addLayout(alt)
+            kat_grid.addWidget(kart, 0, col)
+            self._kat_lbl_n[kat]   = lbl_n
+            self._kat_lbl_var[kat] = lbl_var
+            self._kat_lbl_bit[kat] = lbl_bit
+        self._lay.addLayout(kat_grid)
         self._lay.addWidget(AyiriciCizgi())
 
         # ── Marka/Kategori detay tablosu ─────────────────────────────────
@@ -231,49 +255,15 @@ class IstatistikSayfasi(QWidget):
         self.s_satis_bugun.set_deger(sat_b)
         self.s_giris_bugun.set_deger(gir_b)
 
-        # ── Kategori kartları ────────────────────────────────────────────
-        while self.kat_grid.count():
-            w = self.kat_grid.takeAt(0).widget()
-            if w: w.deleteLater()
-
-        kategoriler = ["Beyin", "ABS", "Plastik"]
-        for col, kat in enumerate(kategoriler):
+        # ── Kategori kartları — sadece değerleri güncelle (widget yeniden oluşturulmaz) ──
+        for kat in ["Beyin", "ABS", "Plastik"]:
             d = df[df["kategori"] == kat] if not df.empty else pd.DataFrame()
-            n_toplam  = len(d)
-            n_stokta  = (d["stok_miktari"] > 0).sum() if n_toplam else 0
-            n_sifir   = n_toplam - n_stokta
-            renk = KAT_RENK.get(kat, RENK["metin2"])
-
-            kart = QFrame()
-            kart.setObjectName("Kart")
-            kart.setStyleSheet(
-                f"QFrame#Kart {{ background: {RENK['yuzey']}; border-radius: 10px; "
-                f"border: 1px solid {RENK['cizgi']}; border-top: 4px solid {renk}; }}")
-            klay = QVBoxLayout(kart)
-            klay.setContentsMargins(16, 14, 16, 14)
-            klay.setSpacing(6)
-
-            lbl_kat_adi = QLabel(kat.upper())
-            lbl_kat_adi.setStyleSheet(
-                f"font-size: 11px; font-weight: 700; letter-spacing: 1.5px; color: {renk};")
-            lbl_n = QLabel(str(n_toplam))
-            lbl_n.setStyleSheet(
-                f"font-size: 32px; font-weight: 700; color: {RENK['metin']};")
-
-            alt_lay = QHBoxLayout()
-            alt_lay.setSpacing(12)
-            lbl_var = QLabel(f"✓ {n_stokta} stokta")
-            lbl_var.setStyleSheet(f"font-size: 11px; color: {RENK['yesil']};")
-            lbl_bit = QLabel(f"✗ {n_sifir} bitti")
-            lbl_bit.setStyleSheet(f"font-size: 11px; color: {RENK['aksan']};")
-            alt_lay.addWidget(lbl_var)
-            alt_lay.addWidget(lbl_bit)
-            alt_lay.addStretch()
-
-            klay.addWidget(lbl_kat_adi)
-            klay.addWidget(lbl_n)
-            klay.addLayout(alt_lay)
-            self.kat_grid.addWidget(kart, 0, col)
+            n_toplam = len(d)
+            n_stokta = int((d["stok_miktari"] > 0).sum()) if n_toplam else 0
+            n_sifir  = n_toplam - n_stokta
+            self._kat_lbl_n[kat].setText(str(n_toplam))
+            self._kat_lbl_var[kat].setText(f"✓ {n_stokta} stokta")
+            self._kat_lbl_bit[kat].setText(f"✗ {n_sifir} bitti")
 
         # ── Detay tablo ──────────────────────────────────────────────────
         if not df.empty:
@@ -285,6 +275,7 @@ class IstatistikSayfasi(QWidget):
         else:
             grp = pd.DataFrame(columns=["marka","kategori","kalem","stokta","sifir"])
 
+        self.detay_tablo.clearContents()
         self.detay_tablo.setRowCount(len(grp))
         for i, (_, r) in enumerate(grp.iterrows()):
             vals = [r["marka"], r["kategori"],
@@ -488,8 +479,16 @@ class KuralDialog(QDialog):
         self.chk_tum=QCheckBox("Tum urunler (bu marka+grup icin)")
         self.chk_tum.setChecked(True)
         self.chk_tum.setStyleSheet(f"font-size:13px;font-weight:600;color:{RENK['metin']};")
-        self.chk_tum.stateChanged.connect(lambda s: self.lst_urun.setEnabled(not bool(s)))
+        self.chk_tum.stateChanged.connect(self._tum_degisti)
         lay.addWidget(self.chk_tum)
+
+        # Ürün arama kutusu
+        self.ara_urun = QLineEdit()
+        self.ara_urun.setPlaceholderText("Ürün ara...")
+        self.ara_urun.setMinimumHeight(32)
+        self.ara_urun.setEnabled(False)
+        self.ara_urun.textChanged.connect(self._urun_filtrele)
+        lay.addWidget(self.ara_urun)
 
         self.lst_urun=QListWidget(); self.lst_urun.setMinimumHeight(150); self.lst_urun.setEnabled(False)
         self.lst_urun.setSelectionMode(QAbstractItemView.SelectionMode.MultiSelection)
@@ -522,6 +521,17 @@ class KuralDialog(QDialog):
         bk=QPushButton("Kaydet"); bk.setObjectName("BtnAksan"); bk.clicked.connect(self._kaydet)
         btn_lay.addWidget(bi); btn_lay.addWidget(bk); lay.addLayout(btn_lay)
 
+    def _tum_degisti(self, state):
+        aktif = not bool(state)
+        self.lst_urun.setEnabled(aktif)
+        self.ara_urun.setEnabled(aktif)
+
+    def _urun_filtrele(self, metin):
+        metin = metin.lower()
+        for i in range(self.lst_urun.count()):
+            item = self.lst_urun.item(i)
+            item.setHidden(metin not in item.text().lower())
+
     def _kat_degisti(self):
         kat=self.cb_kat.currentText()
         conn=get_conn()
@@ -533,11 +543,12 @@ class KuralDialog(QDialog):
 
     def _marka_degisti(self):
         kat=self.cb_kat.currentText(); marka=self.cb_marka.currentText()
+        if not marka: return
         conn=get_conn()
         rows=conn.execute("""SELECT s.id,s.yaygin_ad,COALESCE(d.n,0) dep
                FROM stok s LEFT JOIN (SELECT stok_id,COUNT(*) n FROM stok_birimi WHERE durum='DEPODA' GROUP BY stok_id) d ON d.stok_id=s.id
                WHERE s.kategori=? AND s.marka=? ORDER BY s.yaygin_ad""",(kat,marka)).fetchall()
-        conn.close(); self.lst_urun.clear()
+        conn.close(); self.lst_urun.clear(); self.ara_urun.clear()
         for r in rows:
             item=QListWidgetItem(f"{r['yaygin_ad']}  ({r['dep']} depoda)  [ID:{r['id']}]")
             item.setData(Qt.ItemDataRole.UserRole,r["id"]); self.lst_urun.addItem(item)
