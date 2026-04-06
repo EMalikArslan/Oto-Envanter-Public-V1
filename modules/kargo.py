@@ -270,11 +270,16 @@ class YeniKargoSayfasi(QWidget):
         self.gecmis.verticalHeader().setVisible(False)
         self.gecmis.setAlternatingRowColors(True)
         self.gecmis.setStyleSheet(
-            f"QTableWidget{{ background:#1a1a1a; color:#ddd; gridline-color:#2a2a2a;"
-            f"  border:1px solid #2a2a2a; border-radius:6px; font-size:12px; }}"
-            f"QHeaderView::section{{ background:#222; color:#888; font-size:11px;"
-            f"  font-weight:700; border:none; padding:4px; }}"
-            f"QTableWidget::item:selected{{ background:#C0392B33; }}"
+            f"QTableWidget {{ background:{RENK['yuzey']}; color:{RENK['metin']};"
+            f"  gridline-color:{RENK['cizgi']}; border:1px solid {RENK['cizgi']};"
+            f"  border-radius:6px; font-size:12px;"
+            f"  alternate-background-color:{RENK['yuzey2']}; }}"
+            f"QTableWidget::item {{ color:{RENK['metin']}; padding:4px 8px; border:none; }}"
+            f"QTableWidget::item:selected {{ background:{RENK['aksan_bg']};"
+            f"  color:{RENK['metin']}; }}"
+            f"QHeaderView::section {{ background:{RENK['yuzey2']}; color:{RENK['metin2']};"
+            f"  font-size:11px; font-weight:700; border:none;"
+            f"  border-bottom:1px solid {RENK['cizgi']}; padding:5px 8px; }}"
         )
         hh = self.gecmis.horizontalHeader()
         hh.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)

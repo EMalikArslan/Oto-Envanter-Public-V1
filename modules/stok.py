@@ -163,15 +163,36 @@ class StokYuklemeThread(QThread):
 
 class SheetsThread(QThread):
     """Google Sheets senkronizasyonunu arka planda yapar — UI donmaz."""
-    def __init__(self, satirlar):
+    def __init__(self, satirlar, anlik=False):
         super().__init__()
         self._satirlar = satirlar
+        self._anlik    = anlik   # True → Stok_Anlık sekmesini de güncelle
+
     def run(self):
         try:
             from core.sheets import get_sheets
             sheets = get_sheets()
-            if sheets.aktif:
-                sheets.stok_genel_yenile(self._satirlar)
+            if not sheets.aktif:
+                return
+            # Stok_Genel sekmesi — tüm stok listesi
+            sheets.stok_genel_yenile(self._satirlar)
+            # Stok_Anlık sekmesi — kat+marka bazlı özet (sadece manuel "Gönder" ile)
+            if self._anlik:
+                from collections import defaultdict
+                ozet = defaultdict(int)
+                for r in self._satirlar:
+                    # r = [id, kategori, marka, yaygin_ad, motor,
+                    #      ref1..ref5, fiyat, depoda, turda, guncelleme]
+                    try:
+                        kat   = r[1] or "-"
+                        marka = r[2] or "-"
+                        depoda = int(r[11] or 0)
+                        ozet[(kat, marka)] += depoda
+                    except Exception:
+                        pass
+                liste = [(kat, marka, adet) for (kat, marka), adet in
+                         sorted(ozet.items())]
+                sheets.stok_anlık_guncelle(liste)
         except Exception:
             pass
 
@@ -753,26 +774,42 @@ class StokSayfasi(QWidget):
         conn.close()
         return [list(r) for r in rows]
 
+    def _sheets_calistir(self, rows, anlik=False):
+        """SheetsThread başlatır; finished bağlantısı güvenli şekilde referansı temizler."""
+        t = SheetsThread(rows, anlik=anlik)
+        # Önce referansı temizle, sonra C++ nesnesini sil (sıra önemli!)
+        t.finished.connect(lambda: setattr(self, '_sheets_thread', None))
+        t.finished.connect(t.deleteLater)
+        self._sheets_thread = t
+        t.start()
+
+    def _sheets_calisiyor(self):
+        """SheetsThread çalışıp çalışmadığını güvenli kontrol eder."""
+        if self._sheets_thread is None:
+            return False
+        try:
+            return self._sheets_thread.isRunning()
+        except RuntimeError:
+            self._sheets_thread = None
+            return False
+
     def stok_sheets_gonder(self):
         from core.sheets import get_sheets
         sheets = get_sheets()
         if not sheets.aktif:
             QMessageBox.warning(self, "Sheets", "Ayarlar'dan baglanti kurun."); return
-        # Önceki thread hâlâ çalışıyorsa yeni başlatma
-        if self._sheets_thread and self._sheets_thread.isRunning(): return
+        if self._sheets_calisiyor(): return
         rows = self._stok_satirlari()
-        self._sheets_thread = SheetsThread(rows)
-        self._sheets_thread.finished.connect(self._sheets_thread.deleteLater)
-        self._sheets_thread.start()
-        QMessageBox.information(self, "Gonderiliyor", f"{len(rows)} urun arka planda Sheets'e gonderiliyor.")
+        self._sheets_calistir(rows, anlik=True)
+        QMessageBox.information(self, "Gönderiliyor",
+            f"{len(rows)} ürün arka planda Sheets'e gönderiliyor.\n"
+            f"(Stok_Genel + Stok_Anlık sekmeleri güncelleniyor)")
 
     def _silent_sheets_sync(self):
         """Kullanıcıya bildirim göstermeden arka planda Sheets'e sync eder — UI donmaz."""
-        if self._sheets_thread and self._sheets_thread.isRunning(): return
+        if self._sheets_calisiyor(): return
         rows = self._stok_satirlari()
-        self._sheets_thread = SheetsThread(rows)
-        self._sheets_thread.finished.connect(self._sheets_thread.deleteLater)
-        self._sheets_thread.start()
+        self._sheets_calistir(rows, anlik=False)
 
     def _birim_goster(self):
         sid = self._get_secili_stok_id()
