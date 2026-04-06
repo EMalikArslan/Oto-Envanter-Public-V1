@@ -561,7 +561,7 @@ class StokSayfasi(QWidget):
         self.yukle()
 
     def yukle(self):
-        if hasattr(self,'_yt') and self._yt.isRunning(): return
+        if self._yt is not None and self._yt.isRunning(): return
         self._yt = StokYuklemeThread(self.aktif_kat)
         self._yt.bitti.connect(self._yukle_bitti)
         self._yt.start()
